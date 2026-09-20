@@ -1,0 +1,137 @@
+# YT Analytics Studio
+
+A production-ready web application that replaces `youtubeAnaTest10.ipynb` and `YTRTool.ipynb` with a full React + Flask stack.
+
+## Architecture
+
+```
+yt-analytics/
+├── backend/
+│   ├── app.py                    ← Flask REST API (10 endpoints)
+│   ├── requirements.txt
+│   ├── .env.example
+│   └── services/
+│       ├── analytics_service.py  ← DataService, HeatmapService, KeywordService,
+│       │                            DurationService, DescriptionService
+│       └── researcher_service.py ← ResearcherService (search, autocomplete, tag analysis)
+└── frontend/
+    ├── index.html
+    ├── package.json
+    ├── vite.config.js
+    ├── tailwind.config.js
+    └── src/
+        ├── App.jsx               ← Router + layout shell
+        ├── main.jsx
+        ├── index.css             ← Global styles (CSS variables, Tailwind)
+        ├── hooks/
+        │   ├── useApi.js         ← Axios wrapper (get/post/upload + loading/error)
+        │   └── useDataset.js     ← Shared dataset state
+        ├── components/
+        │   ├── Sidebar.jsx       ← Fixed sidebar navigation
+        │   ├── DataTable.jsx     ← Sortable + drag-to-reorder columns + thumbnails
+        │   └── ui.jsx            ← MetricCard, TagBar, Skeleton, EmptyState, Badge, Select
+        └── pages/
+            ├── Dashboard.jsx     ← File upload, KPI cards, duration chart, main table
+            ├── Heatmap.jsx       ← Calendar heatmap + day-of-week bar charts
+            ├── Keywords.jsx      ← Weighted tags + top vs bottom comparison
+            ├── Descriptions.jsx  ← Per-video description analysis with filters
+            ├── Researcher.jsx    ← Search, autocomplete ideas, competitor tags
+            └── Settings.jsx      ← API key management + system status
+```
+
+## API Endpoints
+
+| Method | Route | Description |
+|--------|-------|-------------|
+| GET    | `/api/settings`                  | Check API key status |
+| POST   | `/api/settings`                  | Save API key (runtime) |
+| POST   | `/api/dashboard/upload`          | Upload Excel/CSV, enrich with YT API |
+| GET    | `/api/dashboard`                 | Return cached dataset |
+| GET    | `/api/heatmap?metric=Views`      | Calendar + day-of-week data |
+| GET    | `/api/keywords/weighted`         | View-weighted tag scores |
+| GET    | `/api/keywords/top-vs-bottom`    | Top 20% vs bottom 20% tag comparison |
+| GET    | `/api/duration?metric=Views`     | Duration bucket analysis |
+| GET    | `/api/descriptions`              | Per-video description data |
+| POST   | `/api/researcher/search`         | YouTube search + tag analysis |
+| GET    | `/api/researcher/ideas?topic=X`  | YouTube autocomplete suggestions |
+| GET    | `/api/health`                    | Health check |
+
+---
+
+## Setup & Running
+
+### 1. Backend
+
+```bash
+cd backend
+
+# Create & activate virtual environment
+python -m venv venv
+source venv/bin/activate      # Windows: venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Download NLTK data (optional but recommended for keyword analysis)
+python -c "import nltk; nltk.download('punkt'); nltk.download('stopwords'); nltk.download('wordnet')"
+
+# Configure environment
+cp .env.example .env
+# Edit .env and add your YOUTUBE_API_KEY
+
+# Run the API
+python app.py
+# → Runs on http://localhost:5000
+```
+
+### 2. Frontend
+
+```bash
+cd frontend
+
+npm install
+npm run dev
+# → Runs on http://localhost:5173
+```
+
+Open **http://localhost:5173** in your browser.
+
+---
+
+## Workflow
+
+1. **Settings** → Enter your YouTube Data API key
+2. **Dashboard** → Upload your YouTube Studio `.xlsx` export (the same file used in the notebook)
+3. **Dashboard** → Browse the sortable table with thumbnails; drag column headers to reorder
+4. **Heatmap** → Switch metrics via the dropdown; view month-by-month and day-of-week charts
+5. **Keywords** → Explore view-weighted tag scores and the top vs bottom performer comparison
+6. **Descriptions** → Search/filter descriptions, see char counts, links, timestamps, hashtags
+7. **Researcher** → Type any query; autocomplete ideas appear as you type; search returns videos + competitor tag scores
+
+---
+
+## Excel File Format
+
+Your YouTube Studio export should have:
+- **Column 1**: Video ID (11-character YouTube IDs)
+- **Video publish time**: datetime column for heatmap
+- **Duration**: in seconds (will be auto-formatted to m:ss)
+- Numeric columns (Views, Impressions, etc.) and percentage columns (CTR, etc.) are auto-detected
+- A `Total` footer row is detected and displayed as a pinned row
+
+---
+
+## Feature Mapping from Notebooks
+
+| Notebook Feature | Web App Location |
+|-----------------|-----------------|
+| `create_html_table()` sortable/drag table | Dashboard → Video Performance Table |
+| `display_calendar_heatmap()` | Heatmap → Monthly Calendar |
+| Day-of-week bar charts | Heatmap → Day-of-week panels |
+| `analyze_duration_vs_metric()` | Dashboard → Duration Bucket chart |
+| `create_video_details_table()` | Descriptions page |
+| `analyze_video_keywords_top_vs_bottom()` | Keywords → Top vs Bottom tab |
+| `analyze_weighted_tags()` (YTRTool) | Keywords → Weighted Tags tab |
+| `youtube_search()` | Researcher → Search |
+| `get_video_ideas()` autocomplete | Researcher → query autocomplete dropdown |
+| `display_videos_html()` | Researcher → Videos grid |
