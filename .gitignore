@@ -1,0 +1,18 @@
+# Environment Variables (Secrets)
+.env
+.env.*
+!.env.example
+
+# Node / Frontend
+node_modules/
+
+# Python / Backend
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# OS generated files (optional but recommended)
+.DS_Store
+Thumbs.db
