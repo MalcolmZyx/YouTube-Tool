@@ -6,7 +6,14 @@ and any outbound HTTP call fails loudly.
 """
 import os
 
+# Pin every setting the tests depend on, so a developer's local .env cannot change test results.
+# Variables that are already set win over the .env file (see config.py).
 os.environ["YOUTUBE_API_KEY"] = ""
+os.environ["CORS_ORIGINS"] = "http://localhost:5173,http://127.0.0.1:5173"
+os.environ["ALLOWED_HOSTS"] = "localhost,127.0.0.1,testserver"  # "testserver" is TestClient's host name
+os.environ["DOCS_ENABLED"] = "true"
+os.environ["MAX_UPLOAD_MB"] = "5"
+os.environ["MAX_ROWS"] = "5000"
 
 import pytest  # noqa: E402
 import requests  # noqa: E402

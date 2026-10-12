@@ -23,6 +23,8 @@ jobs:
         run: ruff check .
       - name: Test
         run: pytest --cov=apps/api --cov-report=term-missing
+      - name: Dependency vulnerability audit
+        run: pip-audit -r apps/api/requirements.txt
 
   frontend:
     runs-on: ubuntu-latest

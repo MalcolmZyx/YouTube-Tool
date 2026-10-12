@@ -17,16 +17,38 @@ BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / ".env")
 
 
+def _split(value: str) -> list[str]:
+    return [item.strip() for item in value.split(",") if item.strip()]
+
+
 class Settings(BaseSettings):
     # Auto-reload on code changes. Safe locally, never enable on a shared host.
     debug: bool = False
     port: int = 5000
-    # Comma-separated list of browser origins allowed to call the API directly.
-    cors_origins: str = "http://localhost:5173"
+    # Comma-separated list of browser origins allowed to call the API (CORS) and to make
+    # state-changing requests (see security.py). Both spellings of localhost are listed
+    # because a browser treats http://localhost:5173 and http://127.0.0.1:5173 as different origins.
+    cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
+    # Host names the server answers to. Anything else is rejected, which blocks DNS rebinding.
+    allowed_hosts: str = "localhost,127.0.0.1"
+    # Interactive docs at /docs. Convenient locally; turn off on a shared host.
+    docs_enabled: bool = True
+    # Limits on an uploaded export. Real Studio exports are tens of kilobytes; the row cap also
+    # bounds the number of YouTube API calls one upload can trigger.
+    max_upload_mb: int = 5
+    max_rows: int = 5000
 
     @property
     def cors_origin_list(self) -> list[str]:
-        return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+        return _split(self.cors_origins)
+
+    @property
+    def allowed_host_list(self) -> list[str]:
+        return _split(self.allowed_hosts)
+
+    @property
+    def max_upload_bytes(self) -> int:
+        return self.max_upload_mb * 1024 * 1024
 
 
 settings = Settings()
