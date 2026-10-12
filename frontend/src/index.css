@@ -1,6 +1,83 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
+
+@theme {
+  --font-display: Syne, sans-serif;
+  --font-body: DM Sans, sans-serif;
+  --font-mono: DM Mono, monospace;
+
+  --color-brand-50: #fff1f1;
+  --color-brand-100: #ffe1e1;
+  --color-brand-200: #ffc7c7;
+  --color-brand-300: #ffa0a0;
+  --color-brand-400: #ff6b6b;
+  --color-brand-500: #ff3c3c;
+  --color-brand-600: #ed1515;
+  --color-brand-700: #c80d0d;
+  --color-brand-800: #a50f0f;
+  --color-brand-900: #881414;
+  --color-brand-950: #4b0404;
+
+  --color-surface-50: #f6f6f7;
+  --color-surface-100: #ededef;
+  --color-surface-200: #d7d7dc;
+  --color-surface-300: #b5b5bd;
+  --color-surface-400: #8d8d99;
+  --color-surface-500: #6f6f7d;
+  --color-surface-600: #5a5a67;
+  --color-surface-700: #4a4a55;
+  --color-surface-800: #3f3f48;
+  --color-surface-900: #383840;
+  --color-surface-950: #111114;
+
+  --animate-fade-in: fadeIn 0.4s ease forwards;
+  --animate-slide-up: slideUp 0.35s ease forwards;
+  --animate-shimmer: shimmer 1.6s infinite linear;
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes shimmer {
+    0% {
+      background-position: -1000px 0;
+    }
+    100% {
+      background-position: 1000px 0;
+    }
+  }
+}
+
+/*
+  The default border color has changed to `currentcolor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentcolor);
+  }
+}
 
 :root {
   --brand: #ff3c3c;

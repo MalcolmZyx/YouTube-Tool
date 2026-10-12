@@ -12,7 +12,7 @@ export default function App() {
     <div className="flex min-h-screen">
       <Sidebar />
       <main className="flex-1 ml-56 overflow-auto">
-        <div className="max-w-screen-2xl mx-auto px-8 py-8">
+        <div className="max-w-(--breakpoint-2xl) mx-auto px-8 py-8">
           <Routes>
             <Route path="/"             element={<Dashboard />}    />
             <Route path="/heatmap"      element={<Heatmap />}      />

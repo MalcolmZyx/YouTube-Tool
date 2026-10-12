@@ -106,7 +106,7 @@ export default function Researcher() {
               </div>
             )}
           </div>
-          <button type="submit" className="btn btn-primary flex-shrink-0" disabled={loading}>
+          <button type="submit" className="btn btn-primary shrink-0" disabled={loading}>
             {loading ? 'Searching…' : '🔍 Search'}
           </button>
         </div>
@@ -186,7 +186,7 @@ export default function Researcher() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-3">
                 {tags.map((t, i) => (
                   <div key={t.tag} className="flex items-center gap-3">
-                    <span className="text-xs font-mono w-5 flex-shrink-0 text-right"
+                    <span className="text-xs font-mono w-5 shrink-0 text-right"
                       style={{ color: 'var(--text-muted)' }}>{i+1}</span>
                     <div className="flex-1 min-w-0">
                       <TagBar tag={t.tag} score={t.score} maxScore={maxTagScore} color="#60a5fa" />

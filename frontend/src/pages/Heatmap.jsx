@@ -115,7 +115,7 @@ export default function Heatmap() {
               <div className="flex items-center gap-1 ml-auto">
                 <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Low</span>
                 {[0.1,0.3,0.55,0.75,1].map(t => (
-                  <div key={t} className="w-5 h-3 rounded-sm"
+                  <div key={t} className="w-5 h-3 rounded-xs"
                     style={{ background: heatColor(t * maxVal, maxVal) }} />
                 ))}
                 <span className="text-xs" style={{ color: 'var(--text-muted)' }}>High</span>
@@ -142,7 +142,7 @@ export default function Heatmap() {
                       {week.map((cell, ci) => cell
                         ? (
                           <div key={ci}
-                            className="relative rounded-sm flex flex-col items-center justify-center cursor-default transition-all duration-150 hover:scale-110 hover:z-10"
+                            className="relative rounded-xs flex flex-col items-center justify-center cursor-default transition-all duration-150 hover:scale-110 hover:z-10"
                             style={{ background: heatColor(cell.value, maxVal), aspectRatio: '1', minHeight: 28 }}
                             onMouseEnter={() => setTooltip(cell)}
                             onMouseLeave={() => setTooltip(null)}

@@ -74,7 +74,7 @@ export default function Keywords() {
                 Score = Σ log₁₀(views+1) per video that uses the tag
               </p>
             </div>
-            <span className="text-xs font-mono px-2 py-1 rounded"
+            <span className="text-xs font-mono px-2 py-1 rounded-sm"
               style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-muted)' }}>
               {wTags.length} tags
             </span>
@@ -88,7 +88,7 @@ export default function Keywords() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-3">
                   {wTags.map((t, i) => (
                     <div key={t.tag} className="flex items-center gap-3">
-                      <span className="text-xs font-mono w-5 flex-shrink-0 text-right"
+                      <span className="text-xs font-mono w-5 shrink-0 text-right"
                         style={{ color: 'var(--text-muted)' }}>{i+1}</span>
                       <div className="flex-1 min-w-0">
                         <TagBar tag={t.tag} score={t.score} maxScore={maxW} />
@@ -119,7 +119,7 @@ export default function Keywords() {
                 ? <p className="text-sm" style={{ color: 'var(--text-muted)' }}>No data.</p>
                 : topTags.map((t, i) => (
                   <div key={t.tag} className="flex items-center gap-3 mb-2.5">
-                    <span className="text-xs font-mono w-5 flex-shrink-0 text-right"
+                    <span className="text-xs font-mono w-5 shrink-0 text-right"
                       style={{ color: 'var(--text-muted)' }}>{i+1}</span>
                     <div className="flex-1 min-w-0">
                       <TagBar tag={t.tag} score={t.score} maxScore={maxTop} color="#4ade80" />
@@ -144,7 +144,7 @@ export default function Keywords() {
                 ? <p className="text-sm" style={{ color: 'var(--text-muted)' }}>No data.</p>
                 : bottomTags.map((t, i) => (
                   <div key={t.tag} className="flex items-center gap-3 mb-2.5">
-                    <span className="text-xs font-mono w-5 flex-shrink-0 text-right"
+                    <span className="text-xs font-mono w-5 shrink-0 text-right"
                       style={{ color: 'var(--text-muted)' }}>{i+1}</span>
                     <div className="flex-1 min-w-0">
                       <TagBar tag={t.tag} score={t.score} maxScore={maxBottom} color="#ff6b6b" />

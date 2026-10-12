@@ -187,7 +187,7 @@ export default function Dashboard() {
                   drag columns to reorder · click header to sort
                 </span>
               </h2>
-              <span className="text-xs font-mono px-2 py-1 rounded"
+              <span className="text-xs font-mono px-2 py-1 rounded-sm"
                 style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-muted)' }}>
                 {dataset.rows?.length} rows
               </span>
