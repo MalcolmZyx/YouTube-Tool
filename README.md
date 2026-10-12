@@ -1,41 +1,45 @@
 # YT Analytics Studio
 
-A work-in-progress web app for analyzing YouTube Studio exports, built with React and Flask. It began as two analysis notebooks (`youtubeAnaTest10.ipynb` and `YTRTool.ipynb`, not included in this repo) and is being grown into a fuller analytics platform. The current version holds one dataset in memory at a time and has no tests yet.
+A work-in-progress web app for analyzing YouTube Studio exports, built with React and Flask. It began as two analysis notebooks (`youtubeAnaTest10.ipynb` and `YTRTool.ipynb`, not included in this repo) and is being grown into a fuller analytics platform. The current version holds one dataset in memory at a time.
 
 ## Architecture
 
 ```
-yt-analytics/
-├── backend/
-│   ├── app.py                    ← Flask REST API (12 endpoints)
-│   ├── requirements.txt
-│   ├── .env.example
-│   └── services/
-│       ├── analytics_service.py  ← DataService, HeatmapService, KeywordService,
-│       │                            DurationService, DescriptionService
-│       └── researcher_service.py ← ResearcherService (search, autocomplete, tag analysis)
-└── frontend/
-    ├── index.html
-    ├── package.json
-    ├── vite.config.js
-    ├── tailwind.config.js
-    └── src/
-        ├── App.jsx               ← Router + layout shell
-        ├── main.jsx
-        ├── index.css             ← Global styles (CSS variables, Tailwind)
-        ├── hooks/
-        │   └── useApi.js         ← Axios wrapper (get/post/upload + loading/error)
-        ├── components/
-        │   ├── Sidebar.jsx       ← Fixed sidebar navigation
-        │   ├── DataTable.jsx     ← Sortable + drag-to-reorder columns + thumbnails
-        │   └── ui.jsx            ← MetricCard, TagBar, Skeleton, EmptyState, Badge, Select
-        └── pages/
-            ├── Dashboard.jsx     ← File upload, KPI cards, duration chart, main table
-            ├── Heatmap.jsx       ← Calendar heatmap + day-of-week bar charts
-            ├── Keywords.jsx      ← Weighted tags + top vs bottom comparison
-            ├── Descriptions.jsx  ← Per-video description analysis with filters
-            ├── Researcher.jsx    ← Search, autocomplete ideas, competitor tags
-            └── Settings.jsx      ← API key management + system status
+YouTube-Tool/
+├── apps/
+│   ├── api/
+│   │   ├── app.py                    ← Flask REST API (12 endpoints)
+│   │   ├── requirements.txt
+│   │   ├── requirements-dev.txt
+│   │   ├── .env.example
+│   │   ├── services/
+│   │   │   ├── analytics_service.py  ← DataService, HeatmapService, KeywordService,
+│   │   │   │                            DurationService, DescriptionService
+│   │   │   └── researcher_service.py ← ResearcherService (search, autocomplete, tag analysis)
+│   │   └── tests/                    ← pytest suite
+│   └── web/
+│       ├── index.html
+│       ├── package.json
+│       ├── vite.config.js
+│       └── src/
+│           ├── App.jsx               ← Router + layout shell
+│           ├── main.jsx
+│           ├── index.css             ← Global styles, Tailwind theme tokens
+│           ├── hooks/
+│           │   └── useApi.js         ← Axios wrapper (get/post/upload + loading/error)
+│           ├── components/
+│           │   ├── Sidebar.jsx       ← Fixed sidebar navigation
+│           │   ├── DataTable.jsx     ← Sortable + drag-to-reorder columns + thumbnails
+│           │   └── ui.jsx            ← MetricCard, TagBar, Skeleton, EmptyState, Badge, Select
+│           └── pages/
+│               ├── Dashboard.jsx     ← File upload, KPI cards, duration chart, main table
+│               ├── Heatmap.jsx       ← Calendar heatmap + day-of-week bar charts
+│               ├── Keywords.jsx      ← Weighted tags + top vs bottom comparison
+│               ├── Descriptions.jsx  ← Per-video description analysis with filters
+│               ├── Researcher.jsx    ← Search, autocomplete ideas, competitor tags
+│               └── Settings.jsx      ← API key management + system status
+├── .github/workflows/ci.yml          ← lint, tests, frontend build
+└── pyproject.toml                    ← ruff, pytest and coverage configuration
 ```
 
 ## API Endpoints
@@ -59,10 +63,12 @@ yt-analytics/
 
 ## Setup & Running
 
+The app is two processes: the Flask API (port 5000) and the Vite dev server for the UI (port 5173). Run both, each in its own terminal. The API has no page of its own, so opening port 5000 in a browser shows a 404.
+
 ### 1. Backend
 
 ```bash
-cd backend
+cd apps/api
 
 # Create & activate virtual environment
 python -m venv venv
@@ -83,7 +89,7 @@ python app.py
 ### 2. Frontend
 
 ```bash
-cd frontend
+cd apps/web
 
 npm install
 npm run dev
@@ -99,10 +105,10 @@ Open **http://localhost:5173** in your browser.
 From the repository root, with the backend virtual environment active:
 
 ```bash
-pip install -r backend/requirements-dev.txt
+pip install -r apps/api/requirements-dev.txt
 
-ruff check .                                  # lint
-pytest --cov=backend --cov-report=term-missing   # tests (never call the real YouTube API)
+ruff check .                                    # lint
+pytest --cov=apps/api --cov-report=term-missing   # tests (never call the real YouTube API)
 ```
 
 GitHub Actions runs the same lint and test steps, plus a frontend production build and `npm audit`, on every pull request.
