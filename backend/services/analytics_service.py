@@ -3,16 +3,14 @@ Analytics Service
 Refactored from youtubeAnaTest10.ipynb
 Handles data ingestion, enrichment, and metric calculations.
 """
+import json
 import math
 import re
-import json
-import warnings
+from collections import defaultdict
+
 import numpy as np
 import pandas as pd
 import requests
-from collections import defaultdict, Counter
-from datetime import datetime
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -84,7 +82,10 @@ class DataService:
         """
         Load a spreadsheet and return a JSON-serialisable dict ready for the frontend.
         """
-        df = pd.read_excel(file_path, engine="openpyxl") if file_path.endswith((".xlsx", ".xlsm")) else pd.read_csv(file_path)
+        if file_path.endswith((".xlsx", ".xlsm")):
+            df = pd.read_excel(file_path, engine="openpyxl")
+        else:
+            df = pd.read_csv(file_path)
 
         # ── Save and strip the "Total" footer row ──────────────────────────
         total_row = None
@@ -114,7 +115,10 @@ class DataService:
         text_cols, numeric_cols, percent_cols = self._classify_columns(df, video_id_col)
 
         # ── Drop all-zero numeric/percent columns ───────────────────────────
-        zero_cols = [c for c in numeric_cols + percent_cols if pd.to_numeric(df[c], errors="coerce").fillna(0).sum() == 0]
+        zero_cols = [
+            c for c in numeric_cols + percent_cols
+            if pd.to_numeric(df[c], errors="coerce").fillna(0).sum() == 0
+        ]
         df.drop(columns=zero_cols, inplace=True, errors="ignore")
         numeric_cols = [c for c in numeric_cols if c not in zero_cols]
         percent_cols = [c for c in percent_cols if c not in zero_cols]
@@ -209,7 +213,7 @@ class DataService:
 
     def _serialise_rows(self, df: pd.DataFrame, video_id_col: str) -> list[dict]:
         rows = []
-        for idx, row in df.iterrows():
+        for _, row in df.iterrows():
             r: dict = {}
             for col in df.columns:
                 val = row[col]

@@ -3,6 +3,9 @@ app.py  –  Flask REST API
 YouTube Analytics & Research Tool
 """
 import os
+
+# ── local imports ─────────────────────────────────────────────────────────
+import sys
 import tempfile
 
 import pandas as pd
@@ -10,12 +13,13 @@ from dotenv import load_dotenv
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 
-# ── local imports ─────────────────────────────────────────────────────────
-import sys
 sys.path.insert(0, os.path.dirname(__file__))
 from services.analytics_service import (
-    DataService, HeatmapService, KeywordService,
-    DurationService, DescriptionService,
+    DataService,
+    DescriptionService,
+    DurationService,
+    HeatmapService,
+    KeywordService,
 )
 from services.researcher_service import ResearcherService
 
@@ -67,7 +71,7 @@ def upload_file():
     """
     Accepts an Excel / CSV upload, runs data preparation and YouTube enrichment,
     and caches the result.
-    
+
     Form fields:
       - file  : the spreadsheet
       - num_rows (optional): limit rows processed
