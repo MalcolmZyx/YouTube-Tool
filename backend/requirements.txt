@@ -1,11 +1,10 @@
 flask==3.0.3
 flask-cors==4.0.1
-pandas
-numpy
+pandas==3.0.6
+numpy==2.5.3
 openpyxl==3.1.5
 google-api-python-client==2.137.0
 requests==2.32.3
 python-dotenv==1.0.1
-scikit-learn
-nltk==3.8.1
+# Flask's own dependency; pinned to the version this app was tested with.
 werkzeug==3.0.3
