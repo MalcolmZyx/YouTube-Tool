@@ -1,8 +1,10 @@
-# Tool configuration only for now. Packaging metadata arrives with the Phase 1 restructure.
+# Tool configuration (ruff, pytest, coverage) for the whole repository.
 
 [tool.ruff]
 line-length = 120
 target-version = "py311"
+# Import root of the API, so local modules (config, deps, schemas, ...) sort as first-party.
+src = ["apps/api"]
 extend-exclude = ["apps/api/venv", "apps/web"]
 
 [tool.ruff.lint]
@@ -13,10 +15,6 @@ select = [
     "B",        # bugbear
     "UP",       # pyupgrade
 ]
-
-[tool.ruff.lint.per-file-ignores]
-# app.py inserts its own directory on sys.path before importing services (removed in Phase 1).
-"apps/api/app.py" = ["E402"]
 
 [tool.coverage.run]
 omit = ["apps/api/tests/*", "apps/api/venv/*"]
