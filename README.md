@@ -1,13 +1,13 @@
 # YT Analytics Studio
 
-A production-ready web application that replaces `youtubeAnaTest10.ipynb` and `YTRTool.ipynb` with a full React + Flask stack.
+A work-in-progress web app for analyzing YouTube Studio exports, built with React and Flask. It began as two analysis notebooks (`youtubeAnaTest10.ipynb` and `YTRTool.ipynb`, not included in this repo) and is being grown into a fuller analytics platform. The current version holds one dataset in memory at a time and has no tests yet.
 
 ## Architecture
 
 ```
 yt-analytics/
 ├── backend/
-│   ├── app.py                    ← Flask REST API (10 endpoints)
+│   ├── app.py                    ← Flask REST API (12 endpoints)
 │   ├── requirements.txt
 │   ├── .env.example
 │   └── services/
@@ -24,8 +24,7 @@ yt-analytics/
         ├── main.jsx
         ├── index.css             ← Global styles (CSS variables, Tailwind)
         ├── hooks/
-        │   ├── useApi.js         ← Axios wrapper (get/post/upload + loading/error)
-        │   └── useDataset.js     ← Shared dataset state
+        │   └── useApi.js         ← Axios wrapper (get/post/upload + loading/error)
         ├── components/
         │   ├── Sidebar.jsx       ← Fixed sidebar navigation
         │   ├── DataTable.jsx     ← Sortable + drag-to-reorder columns + thumbnails
@@ -72,9 +71,6 @@ source venv/bin/activate      # Windows: venv\Scripts\activate
 # Install dependencies
 pip install -r requirements.txt
 
-# Download NLTK data (optional but recommended for keyword analysis)
-python -c "import nltk; nltk.download('punkt'); nltk.download('stopwords'); nltk.download('wordnet')"
-
 # Configure environment
 cp .env.example .env
 # Edit .env and add your YOUTUBE_API_KEY
@@ -101,7 +97,7 @@ Open **http://localhost:5173** in your browser.
 ## Workflow
 
 1. **Settings** → Enter your YouTube Data API key
-2. **Dashboard** → Upload your YouTube Studio `.xlsx` export (the same file used in the notebook)
+2. **Dashboard** → Upload your YouTube Studio `.xlsx` export (Advanced mode, "Table data")
 3. **Dashboard** → Browse the sortable table with thumbnails; drag column headers to reorder
 4. **Heatmap** → Switch metrics via the dropdown; view month-by-month and day-of-week charts
 5. **Keywords** → Explore view-weighted tag scores and the top vs bottom performer comparison
@@ -122,6 +118,8 @@ Your YouTube Studio export should have:
 ---
 
 ## Feature Mapping from Notebooks
+
+The original notebooks are not included in this repository; this table records where each of their features now lives.
 
 | Notebook Feature | Web App Location |
 |-----------------|-----------------|
