@@ -28,7 +28,7 @@ export function TagBar({ tag, score, maxScore, color = 'var(--brand)' }) {
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between mb-1">
           <span className="text-xs font-mono truncate" style={{ color: 'var(--text-primary)' }}>{tag}</span>
-          <span className="text-xs ml-2 flex-shrink-0" style={{ color: 'var(--text-muted)' }}>{score.toFixed(1)}</span>
+          <span className="text-xs ml-2 shrink-0" style={{ color: 'var(--text-muted)' }}>{score.toFixed(1)}</span>
         </div>
         <div className="h-1.5 rounded-full" style={{ background: 'rgba(255,255,255,0.06)' }}>
           <div className="h-full rounded-full transition-all duration-500"

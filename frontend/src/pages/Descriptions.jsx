@@ -94,7 +94,7 @@ export default function Descriptions() {
             <div className="flex gap-4">
               {/* Thumbnail */}
               {v.thumbnail_url && (
-                <a href={v.url} target="_blank" rel="noreferrer" className="flex-shrink-0">
+                <a href={v.url} target="_blank" rel="noreferrer" className="shrink-0">
                   <img src={v.thumbnail_url} alt={v.title}
                     className="rounded-lg object-cover" style={{ width: 120, height: 68 }} />
                 </a>
@@ -109,7 +109,7 @@ export default function Descriptions() {
                     {v.title || v.video_id}
                   </a>
                   {/* Badges */}
-                  <div className="flex items-center gap-1 flex-shrink-0">
+                  <div className="flex items-center gap-1 shrink-0">
                     {v.has_links      && <Badge color="blue">links</Badge>}
                     {v.has_hashtags   && <Badge color="amber">#tags</Badge>}
                     {v.has_timestamps && <Badge color="green">time</Badge>}

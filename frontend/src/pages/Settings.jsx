@@ -73,15 +73,15 @@ export default function Settings() {
               {showKey ? '🙈' : '👁️'}
             </button>
           </div>
-          <button className="btn btn-primary flex-shrink-0" onClick={handleSave} disabled={loading}>
+          <button className="btn btn-primary shrink-0" onClick={handleSave} disabled={loading}>
             Save Key
           </button>
         </div>
 
         <p className="text-xs mt-3" style={{ color: 'var(--text-muted)' }}>
           The key is stored only in memory for the current Flask session. 
-          Add it to your <code className="font-mono px-1 rounded" style={{ background: 'rgba(255,255,255,0.08)' }}>.env</code> file 
-          as <code className="font-mono px-1 rounded" style={{ background: 'rgba(255,255,255,0.08)' }}>YOUTUBE_API_KEY</code> for persistence.
+          Add it to your <code className="font-mono px-1 rounded-sm" style={{ background: 'rgba(255,255,255,0.08)' }}>.env</code> file 
+          as <code className="font-mono px-1 rounded-sm" style={{ background: 'rgba(255,255,255,0.08)' }}>YOUTUBE_API_KEY</code> for persistence.
         </p>
       </section>
 
@@ -98,7 +98,7 @@ export default function Settings() {
             'Copy the key and paste it above',
           ].map((step, i) => (
             <li key={i} className="flex items-start gap-3 text-sm" style={{ color: 'var(--text-muted)' }}>
-              <span className="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-xs font-display font-bold"
+              <span className="shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-xs font-display font-bold"
                 style={{ background: 'var(--brand-dim)', color: 'var(--brand)', marginTop: 1 }}>
                 {i+1}
               </span>
