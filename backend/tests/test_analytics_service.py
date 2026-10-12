@@ -3,6 +3,8 @@
 They pin down current behavior so later refactors (batching, FastAPI, Postgres) can be
 checked against it.
 """
+import datetime
+import json
 import math
 
 import pandas as pd
@@ -129,6 +131,24 @@ def test_load_file_without_key_leaves_metadata_empty(studio_csv):
     # hidden helper columns are not offered for display
     assert "thumbnail_url" not in result["columns"]
     assert "video_title" not in result["columns"]
+
+
+def test_load_file_serialises_excel_time_cells(tmp_path):
+    """Studio exports store 'Average view duration' as an Excel time, which pandas reads as datetime.time."""
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    ws = wb.active
+    ws.append(["Content", "Views", "Average view duration"])
+    ws.append(["AAAAAAAAAAA", 10, datetime.time(0, 0, 56)])
+    ws.append(["BBBBBBBBBBB", 20, datetime.time(0, 1, 3)])
+    path = tmp_path / "export.xlsx"
+    wb.save(path)
+
+    result = DataService().load_file(str(path))
+
+    assert [r["Average view duration"] for r in result["rows"]] == ["00:00:56", "00:01:03"]
+    json.dumps(result)  # the whole payload must be JSON serialisable
 
 
 def test_load_file_num_rows_limits_videos(studio_csv):

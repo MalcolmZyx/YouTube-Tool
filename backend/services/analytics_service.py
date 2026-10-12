@@ -3,6 +3,7 @@ Analytics Service
 Refactored from youtubeAnaTest10.ipynb
 Handles data ingestion, enrichment, and metric calculations.
 """
+import datetime
 import json
 import math
 import re
@@ -219,6 +220,8 @@ class DataService:
                 val = row[col]
                 if isinstance(val, pd.Timestamp):
                     r[col] = val.isoformat() if not pd.isna(val) else None
+                elif isinstance(val, datetime.time):
+                    r[col] = val.isoformat()  # Excel time cells, e.g. "Average view duration"
                 elif isinstance(val, float) and math.isnan(val):
                     r[col] = None
                 else:
