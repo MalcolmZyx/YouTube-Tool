@@ -1,6 +1,6 @@
 # YT Analytics Studio
 
-A work-in-progress web app for analyzing YouTube Studio exports, built with React and Flask. It began as two analysis notebooks (`youtubeAnaTest10.ipynb` and `YTRTool.ipynb`, not included in this repo) and is being grown into a fuller analytics platform. The current version holds one dataset in memory at a time.
+A work-in-progress web app for analyzing YouTube Studio exports, built with React and FastAPI. It began as two analysis notebooks (`youtubeAnaTest10.ipynb` and `YTRTool.ipynb`, not included in this repo) and is being grown into a fuller analytics platform. The current version holds one dataset in memory at a time.
 
 ## Architecture
 
@@ -8,7 +8,12 @@ A work-in-progress web app for analyzing YouTube Studio exports, built with Reac
 YouTube-Tool/
 ├── apps/
 │   ├── api/
-│   │   ├── app.py                    ← Flask REST API (12 endpoints)
+│   │   ├── app.py                    ← FastAPI app: middleware, error handlers, router wiring
+│   │   ├── config.py                 ← Settings from environment variables
+│   │   ├── deps.py                   ← Service instances, loaded-dataset cache, request guards
+│   │   ├── errors.py                 ← All failures returned as {"error": "..."}
+│   │   ├── schemas.py                ← Request/response models (pydantic)
+│   │   ├── routers/                  ← system, dashboard, analysis, researcher (12 endpoints)
 │   │   ├── requirements.txt
 │   │   ├── requirements-dev.txt
 │   │   ├── .env.example
@@ -63,7 +68,7 @@ YouTube-Tool/
 
 ## Setup & Running
 
-The app is two processes: the Flask API (port 5000) and the Vite dev server for the UI (port 5173). Run both, each in its own terminal. The API has no page of its own, so opening port 5000 in a browser shows a 404.
+The app is two processes: the FastAPI server (port 5000) and the Vite dev server for the UI (port 5173). Run both, each in its own terminal. The API has no page of its own, so opening `/` on port 5000 shows a 404; open http://localhost:5000/docs for the interactive API documentation instead.
 
 ### 1. Backend
 
@@ -81,9 +86,9 @@ pip install -r requirements.txt
 cp .env.example .env
 # Edit .env and add your YOUTUBE_API_KEY
 
-# Run the API
+# Run the API (add DEBUG=true to .env for auto-reload while developing)
 python app.py
-# → Runs on http://localhost:5000
+# → Runs on http://localhost:5000, API docs at http://localhost:5000/docs
 ```
 
 ### 2. Frontend

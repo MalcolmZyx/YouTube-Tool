@@ -10,6 +10,7 @@ import math
 import pandas as pd
 import pytest
 import requests
+
 from services.analytics_service import (
     DataService,
     DescriptionService,

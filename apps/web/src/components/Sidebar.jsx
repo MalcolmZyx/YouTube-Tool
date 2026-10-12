@@ -49,7 +49,7 @@ export default function Sidebar() {
 
       {/* Footer */}
       <div className="px-5 py-4 border-t text-xs" style={{ borderColor: 'var(--surface-border)', color: 'var(--text-muted)' }}>
-        v1.0.0 · Flask + React
+        v0.2.0 · FastAPI + React
       </div>
     </aside>
   )

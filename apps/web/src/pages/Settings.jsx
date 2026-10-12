@@ -79,7 +79,7 @@ export default function Settings() {
         </div>
 
         <p className="text-xs mt-3" style={{ color: 'var(--text-muted)' }}>
-          The key is stored only in memory for the current Flask session. 
+          The key is stored only in memory for the current API server session.
           Add it to your <code className="font-mono px-1 rounded-sm" style={{ background: 'rgba(255,255,255,0.08)' }}>.env</code> file 
           as <code className="font-mono px-1 rounded-sm" style={{ background: 'rgba(255,255,255,0.08)' }}>YOUTUBE_API_KEY</code> for persistence.
         </p>
@@ -113,7 +113,7 @@ export default function Settings() {
         <h2 className="font-display font-bold text-base mb-4">System Status</h2>
         <div className="space-y-2">
           {[
-            { label: 'Flask API', ok: true },
+            { label: 'API server', ok: true },
             { label: 'Dataset loaded', ok: health?.cache_loaded },
             { label: 'API key configured', ok: keyStatus?.has_api_key },
           ].map(({ label, ok }) => (
