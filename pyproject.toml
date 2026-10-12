@@ -3,7 +3,7 @@
 [tool.ruff]
 line-length = 120
 target-version = "py311"
-extend-exclude = ["backend/venv", "frontend"]
+extend-exclude = ["apps/api/venv", "apps/web"]
 
 [tool.ruff.lint]
 select = [
@@ -16,12 +16,12 @@ select = [
 
 [tool.ruff.lint.per-file-ignores]
 # app.py inserts its own directory on sys.path before importing services (removed in Phase 1).
-"backend/app.py" = ["E402"]
+"apps/api/app.py" = ["E402"]
 
 [tool.coverage.run]
-omit = ["backend/tests/*", "backend/venv/*"]
+omit = ["apps/api/tests/*", "apps/api/venv/*"]
 
 [tool.pytest.ini_options]
-testpaths = ["backend/tests"]
-pythonpath = ["backend"]
+testpaths = ["apps/api/tests"]
+pythonpath = ["apps/api"]
 addopts = "-ra"
