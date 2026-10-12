@@ -13,6 +13,9 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
+.pytest_cache/
+.ruff_cache/
+.coverage
 
 # OS generated files (optional but recommended)
 .DS_Store

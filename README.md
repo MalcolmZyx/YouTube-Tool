@@ -94,6 +94,21 @@ Open **http://localhost:5173** in your browser.
 
 ---
 
+## Development
+
+From the repository root, with the backend virtual environment active:
+
+```bash
+pip install -r backend/requirements-dev.txt
+
+ruff check .                                  # lint
+pytest --cov=backend --cov-report=term-missing   # tests (never call the real YouTube API)
+```
+
+GitHub Actions runs the same lint and test steps, plus a frontend production build and `npm audit`, on every pull request.
+
+---
+
 ## Workflow
 
 1. **Settings** → Enter your YouTube Data API key

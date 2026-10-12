@@ -1,0 +1,27 @@
+# Tool configuration only for now. Packaging metadata arrives with the Phase 1 restructure.
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+extend-exclude = ["backend/venv", "frontend"]
+
+[tool.ruff.lint]
+select = [
+    "E", "W",   # pycodestyle
+    "F",        # pyflakes
+    "I",        # import sorting
+    "B",        # bugbear
+    "UP",       # pyupgrade
+]
+
+[tool.ruff.lint.per-file-ignores]
+# app.py inserts its own directory on sys.path before importing services (removed in Phase 1).
+"backend/app.py" = ["E402"]
+
+[tool.coverage.run]
+omit = ["backend/tests/*", "backend/venv/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["backend/tests"]
+pythonpath = ["backend"]
+addopts = "-ra"

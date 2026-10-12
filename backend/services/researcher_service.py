@@ -3,11 +3,12 @@ YouTube Researcher Service
 Refactored from YTRTool.ipynb
 Handles search, autocomplete ideas, and competitor tag analysis.
 """
-import re
 import json
 import math
-import requests
+import re
 from collections import defaultdict
+
+import requests
 from googleapiclient.discovery import build
 
 
