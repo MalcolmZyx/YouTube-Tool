@@ -13,7 +13,7 @@ from datetime import date
 import numpy as np
 import pandas as pd
 
-from audit.stats import Comparison, compare, log_linear_fit
+from audit.stats import Comparison, compare, holm_adjust, log_linear_fit, spearman
 
 SHORT_MAX_SECONDS = 60  # Studio's export has no "is a Short" flag, so duration is the proxy (documented limitation)
 MIN_VIDEOS = 8  # fewer than this and most analyses are not attempted
@@ -82,23 +82,31 @@ def overview(ctx: Context) -> Finding:
     }, caveats)
 
 
-def performance(ctx: Context) -> Finding:
-    """Views compared with what a video of that age usually has, so old videos do not win just by being old."""
+def _scored(ctx: Context) -> tuple[pd.DataFrame, float, float] | str:
+    """Each judgeable video with its index (views / views typical for its age), or the reason it cannot be done."""
     frame = ctx.frame.copy()
     frame["views"] = _num(frame, VIEWS)
     frame["age"] = (pd.Timestamp(ctx.as_of) - pd.to_datetime(frame[PUBLISHED], errors="coerce")).dt.days
     usable = frame.dropna(subset=["views", "age"])
     usable = usable[usable["age"] >= 0]
     if len(usable) < MIN_VIDEOS:
-        return Finding("performance", "Standout videos", f"Needs at least {MIN_VIDEOS} dated videos; this export has "
-                       f"{len(usable)}.", "not_enough_data")
-
+        return f"Needs at least {MIN_VIDEOS} dated videos; this export has {len(usable)}."
     fit_rows = usable[usable["age"] >= TOO_NEW_DAYS]
     if len(fit_rows) < MIN_VIDEOS:
-        return Finding("performance", "Standout videos", "Most videos are too new to judge.", "not_enough_data")
+        return "Most videos are too new to judge."
+    if fit_rows["age"].nunique() < 3:
+        return "The videos are too close in age to tell age from performance."
     slope, intercept, r2 = log_linear_fit(fit_rows["age"], fit_rows["views"])
     expected = 10 ** (slope * np.log10(fit_rows["age"] + 1) + intercept) - 1
-    scored = fit_rows.assign(expected=expected, index=fit_rows["views"] / expected.clip(lower=1))
+    return fit_rows.assign(expected=expected, index=fit_rows["views"] / expected.clip(lower=1)), slope, r2
+
+
+def performance(ctx: Context) -> Finding:
+    """Views compared with what a video of that age usually has, so old videos do not win just by being old."""
+    result = _scored(ctx)
+    if isinstance(result, str):
+        return Finding("performance", "Standout videos", result, "not_enough_data")
+    scored, slope, r2 = result
 
     def rows(frame_):
         return [
@@ -233,7 +241,136 @@ def click_through(ctx: Context) -> Finding:
     )
 
 
-ANALYSES = (overview, performance, cadence, formats, click_through)
+TITLE_FEATURES = {
+    "a question mark": lambda t: "?" in t,
+    "a number": lambda t: any(ch.isdigit() for ch in t),
+    "a long title (longer than the channel's median)": None,  # needs the channel's median, filled in below
+    "a word in ALL CAPS": lambda t: any(w.isalpha() and len(w) >= 3 and w.isupper() for w in t.split()),
+}
+
+
+def title_features(ctx: Context) -> Finding:
+    """Do titles with a feature (a question, a number, ...) beat the age-adjusted typical video?
+
+    Several features are tried at once, so the p-values are corrected for that (Holm). Without the correction, trying
+    four features gives about a one in five chance of "finding" something in pure noise.
+    """
+    result = _scored(ctx)
+    if isinstance(result, str):
+        return Finding("title_features", "Title features", result, "not_enough_data")
+    scored = result[0]
+    titles = scored[TITLE].fillna("").astype(str)
+    median_length = float(titles.str.len().median())
+
+    rows, p_values = [], []
+    for name, test in TITLE_FEATURES.items():
+        has = titles.str.len() > median_length if test is None else titles.map(test)
+        c = compare(scored.loc[has, "index"], scored.loc[~has, "index"])
+        rows.append({"feature": name, "n_with": c.n_a, "n_without": c.n_b, "median_index_with": c.median_a,
+                     "median_index_without": c.median_b, "ratio": c.ratio, "ratio_low": c.ratio_low,
+                     "ratio_high": c.ratio_high, "p_value": c.p_value, "strength": c.strength})
+        p_values.append(c.p_value)
+    tested = [i for i, p in enumerate(p_values) if p is not None]
+    for i, adjusted in zip(tested, holm_adjust([p_values[i] for i in tested]), strict=True):
+        rows[i]["p_adjusted"] = adjusted
+        # Trust follows the corrected p-value, and never goes above what the sample size allowed.
+        allowed = "solid" if adjusted < 0.01 else "suggestive" if adjusted < 0.05 else "weak"
+        order = ["not_enough_data", "weak", "suggestive", "solid"]
+        rows[i]["strength"] = min(rows[i]["strength"], allowed, key=order.index)
+    for row in rows:
+        row.setdefault("p_adjusted", None)
+
+    caveats = [
+        f"{len(tested)} of {len(rows)} features had enough videos to test; the p-values are corrected for testing "
+        "several at once.",
+        "Titles differ in many ways at once (topic, thumbnail, timing). A feature that looks better here is a lead "
+        "to test on new videos, not proof it caused the difference.",
+    ]
+    winners = [r for r in rows if r["p_adjusted"] is not None and r["p_adjusted"] < 0.05]
+    if not tested:
+        return Finding("title_features", "Title features", "Too few videos with and without each feature.",
+                       "not_enough_data", {"features": rows}, caveats)
+    if winners:
+        best = min(winners, key=lambda r: r["p_adjusted"])
+        direction = "higher" if best["ratio"] > 1 else "lower"
+        headline = (f"Titles with {best['feature']} have a {direction} age-adjusted index "
+                    f"({best['ratio']:.2f}x, adjusted p = {best['p_adjusted']:.3f}).")
+        strength = best["strength"]
+    else:
+        headline = ("No title feature shows a reliable difference once the p-values are corrected for testing "
+                    f"{len(tested)} features at once.")
+        strength = "weak"
+    return Finding("title_features", "Title features", headline, strength, {"features": rows}, caveats)
+
+
+def duration_effect(ctx: Context) -> Finding:
+    """Within each format, do longer videos do better or worse than typical for their age?"""
+    result = _scored(ctx)
+    if isinstance(result, str):
+        return Finding("duration", "Video length", result, "not_enough_data")
+    scored = result[0]
+    duration = _num(scored, DURATION)
+    groups = {"Shorts": duration <= SHORT_MAX_SECONDS, "Long-form": duration > SHORT_MAX_SECONDS}
+    rows = []
+    for name, mask in groups.items():
+        c = spearman(duration[mask], scored.loc[mask, "index"])
+        rows.append({"format": name, "videos": c.n, "rho": c.rho, "low": c.low, "high": c.high,
+                     "p_value": c.p_value, "strength": c.strength})
+    usable = [r for r in rows if r["rho"] is not None]
+    caveats = ["Correlation is not cause: longer videos may also differ in topic or audience.",
+               "Shorts and long-form are examined separately because they behave differently."]
+    if not usable:
+        return Finding("duration", "Video length", "Too few videos of either format to look for a length effect.",
+                       "not_enough_data", {"formats": rows}, caveats)
+    lead = max(usable, key=lambda r: abs(r["rho"]))
+    clear = lead["low"] > 0 or lead["high"] < 0
+    verdict = (f"Among {lead['format']} ({lead['videos']} videos), longer videos tend to do "
+               f"{'better' if lead['rho'] > 0 else 'worse'} than typical for their age (rank correlation "
+               f"{lead['rho']:.2f}, 95% range {lead['low']:.2f} to {lead['high']:.2f}).") if clear else (
+        f"No clear link between video length and performance: the strongest was {lead['format']} "
+        f"({lead['videos']} videos) at {lead['rho']:.2f}, with a range ({lead['low']:.2f} to {lead['high']:.2f}) "
+        "that includes 0.")
+    strength = lead["strength"] if clear else "weak"
+    return Finding("duration", "Video length", verdict, strength, {"formats": rows}, caveats)
+
+
+def retention(ctx: Context) -> Finding:
+    """How much of each video people watch, and videos people click but then leave."""
+    frame = ctx.frame.copy()
+    frame["retention"], frame["views"] = _num(frame, RETENTION), _num(frame, VIEWS)
+    duration = _num(frame, DURATION)
+    seen = frame.dropna(subset=["retention", "views"])
+    if len(seen) < MIN_VIDEOS:
+        return Finding("retention", "Audience retention",
+                       f"Needs at least {MIN_VIDEOS} videos with an average percentage viewed; this export has "
+                       f"{len(seen)}.", "not_enough_data")
+    by_format = {}
+    for name, mask in {"Shorts": duration <= SHORT_MAX_SECONDS, "Long-form": duration > SHORT_MAX_SECONDS}.items():
+        group = seen.loc[mask.reindex(seen.index, fill_value=False), "retention"]
+        if len(group):
+            by_format[name] = {"videos": len(group), "median_percent_viewed": float(group.median())}
+    low = seen["retention"].quantile(0.25)
+    flagged = seen[(seen["views"] >= seen["views"].median()) & (seen["retention"] <= low)]
+    flagged = flagged.sort_values("views", ascending=False)
+    candidates = [
+        _video(r, views=float(r["views"]), percent_viewed=float(r["retention"])) for _, r in flagged.head(5).iterrows()
+    ]
+    parts = [
+        f"{name}: median {v['median_percent_viewed']:.0f}% viewed ({v['videos']} videos)"
+        for name, v in by_format.items()
+    ]
+    headline = ("; ".join(parts) + ". " if parts else "") + (
+        f"{len(flagged)} well-viewed videos kept less than the bottom quarter ({low:.0f}%) of their viewers."
+        if len(flagged) else "No well-viewed video has unusually low retention.")
+    return Finding(
+        "retention", "Audience retention", headline, "info",
+        {"by_format": by_format, "bottom_quarter_percent": float(low), "candidates": candidates},
+        ["Shorts replay, so their average percentage viewed can exceed 100%.",
+         "Average percentage viewed is one number per video; the export has no minute-by-minute retention curve."],
+    )
+
+
+ANALYSES = (overview, performance, cadence, formats, duration_effect, title_features, retention, click_through)
 
 
 def run_audit(ctx: Context) -> list[Finding]:
