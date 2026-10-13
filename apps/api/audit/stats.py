@@ -71,3 +71,50 @@ def log_linear_fit(x, y) -> tuple[float, float, float]:
     total = ((ly - ly.mean()) ** 2).sum()
     r_squared = 1 - (residual ** 2).sum() / total if total else 0.0
     return float(slope), float(intercept), float(r_squared)
+
+
+def holm_adjust(p_values: list[float]) -> list[float]:
+    """Holm's step-down correction: p-values adjusted for having tested several things at once."""
+    order = sorted(range(len(p_values)), key=lambda i: p_values[i])
+    adjusted = [0.0] * len(p_values)
+    running = 0.0
+    for rank, i in enumerate(order):
+        running = max(running, min(1.0, (len(p_values) - rank) * p_values[i]))
+        adjusted[i] = running
+    return adjusted
+
+
+@dataclass(frozen=True)
+class Correlation:
+    n: int
+    rho: float | None  # Spearman rank correlation, -1..1
+    low: float | None  # 95% bootstrap interval
+    high: float | None
+    p_value: float | None
+    strength: str
+
+
+def spearman(x, y) -> Correlation:
+    """Rank correlation between two measures, with a bootstrap interval. Blank pairs are dropped."""
+    x, y = np.asarray(x, dtype=float), np.asarray(y, dtype=float)
+    keep = ~(np.isnan(x) | np.isnan(y))
+    x, y = x[keep], y[keep]
+    n = x.size
+    if n < MIN_PER_GROUP * 2 or np.ptp(x) == 0 or np.ptp(y) == 0:
+        return Correlation(n, None, None, None, None, "not_enough_data")
+    result = stats.spearmanr(x, y)
+    rng = np.random.default_rng(SEED)
+    draws = np.empty(BOOTSTRAP_RESAMPLES)
+    for i in range(BOOTSTRAP_RESAMPLES):
+        pick = rng.integers(0, n, n)
+        draws[i] = stats.spearmanr(x[pick], y[pick]).statistic
+    low, high = np.nanpercentile(draws, [2.5, 97.5])
+    if n < SOLID_PER_GROUP * 2:
+        strength = "weak"
+    elif result.pvalue < 0.01:
+        strength = "solid"
+    elif result.pvalue < 0.05:
+        strength = "suggestive"
+    else:
+        strength = "weak"
+    return Correlation(n, float(result.statistic), float(low), float(high), float(result.pvalue), strength)

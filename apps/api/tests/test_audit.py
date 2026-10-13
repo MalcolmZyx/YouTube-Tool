@@ -14,17 +14,22 @@ from audit.engine import (
     ID,
     IMPRESSIONS,
     PUBLISHED,
+    RETENTION,
     TITLE,
     VIEWS,
     Context,
     cadence,
     click_through,
+    duration_effect,
     formats,
     overview,
     performance,
+    retention,
     run_audit,
+    title_features,
 )
-from audit.stats import compare, log_linear_fit
+from audit.report import render_html
+from audit.stats import compare, holm_adjust, log_linear_fit, spearman
 from db.session import get_session
 from synthetic.generator import PROFILES, write_export
 
@@ -191,7 +196,8 @@ def test_click_through_with_no_impressions_is_not_enough_data():
 def test_the_whole_audit_runs_on_an_empty_channel_without_crashing():
     findings = run_audit(Context(make_frame([{}]), {}, AS_OF, "unknown"))
 
-    assert [f.key for f in findings] == ["overview", "performance", "cadence", "formats", "click_through"]
+    assert [f.key for f in findings] == [
+        "overview", "performance", "cadence", "formats", "duration", "title_features", "retention", "click_through"]
     assert {f.strength for f in findings} <= {"info", "not_enough_data"}
 
 
@@ -222,7 +228,8 @@ def test_audit_route_on_a_fake_channel_finds_the_planted_shorts_effect(api, tmp_
     assert body["videos"] == PROFILES[0].videos and body["period_kind"] == "range"
     assert body["as_of"] == "2026-10-01" and "date range" in body["as_of_source"]
     findings = {f["key"]: f for f in body["findings"]}
-    assert set(findings) == {"overview", "performance", "cadence", "formats", "click_through"}
+    assert set(findings) == {"overview", "performance", "cadence", "formats", "duration", "title_features",
+                             "retention", "click_through"}
     assert findings["formats"]["details"]["ratio"] > 1  # Shorts did better, as planted
     assert findings["click_through"]["details"]["videos_with_impressions"] > 0
     assert all(f["headline"] for f in body["findings"])
@@ -246,3 +253,139 @@ def test_audit_unknown_and_empty_clients_are_404(api):
     assert api.get(f"/api/clients/{uuid.uuid4()}/audit").status_code == 404
     empty = api.post("/api/clients", json={"name": "Empty"}).json()
     assert api.get(f"/api/clients/{empty['id']}/audit").status_code == 404
+
+
+# ── title features, length, retention ───────────────────────────────────────
+
+
+def test_holm_correction_raises_p_values_and_keeps_their_order():
+    assert holm_adjust([0.01, 0.04, 0.03]) == pytest.approx([0.03, 0.06, 0.06])
+    assert holm_adjust([0.5]) == [0.5]
+    assert all(a >= p for a, p in zip(holm_adjust([0.2, 0.001, 0.04]), [0.2, 0.001, 0.04], strict=True))
+
+
+def test_spearman_finds_a_monotone_link_and_reports_nothing_for_tiny_samples():
+    x = np.arange(40)
+    clear = spearman(x, x ** 2)
+
+    assert clear.rho == pytest.approx(1.0) and clear.low > 0.9 and clear.strength == "solid"
+    assert spearman([1, 2, 3], [3, 2, 1]).strength == "not_enough_data"
+    assert spearman(np.arange(30), np.full(30, 5.0)).strength == "not_enough_data"  # nothing varies
+
+
+def title_rows(with_feature, without_feature, feature_title, plain_title, good=3000.0, bad=300.0):
+    rows = []
+    for i in range(with_feature):
+        rows.append({"age": 100 + i, "views": good + i, "title": f"{feature_title} {i}"})
+    for i in range(without_feature):
+        rows.append({"age": 100 + i, "views": bad + i, "title": f"{plain_title} {i}"})
+    return rows
+
+
+def with_titles(rows):
+    frame = make_frame(rows)
+    frame[TITLE] = [r.get("title", "") for r in rows]
+    return Context(frame, {}, AS_OF, "lifetime")
+
+
+def test_a_planted_title_effect_survives_the_correction():
+    f = title_features(with_titles(title_rows(30, 30, "Is this real?", "A plain title")))
+
+    assert "a question mark" in f.headline and "higher" in f.headline
+    question = next(r for r in f.details["features"] if r["feature"] == "a question mark")
+    assert question["p_adjusted"] < 0.01 and question["strength"] == "solid"
+
+
+def test_titles_with_no_effect_do_not_produce_a_finding():
+    rng = np.random.default_rng(5)
+    rows = [{"age": 100 + i, "views": float(v), "title": ("Why? " if i % 2 else "So ") + f"{i}"}
+            for i, v in enumerate(rng.lognormal(7, 0.5, 60))]
+
+    f = title_features(with_titles(rows))
+
+    assert f.headline.startswith("No title feature shows a reliable difference") and f.strength == "weak"
+
+
+def test_title_features_with_one_sided_data_are_skipped_not_invented():
+    f = title_features(with_titles(title_rows(2, 40, "Why?", "Plain")))
+
+    question = next(r for r in f.details["features"] if r["feature"] == "a question mark")
+    assert question["p_value"] is None and question["strength"] == "not_enough_data"
+
+
+def test_duration_effect_finds_a_planted_link_within_long_form():
+    # age is made unrelated to length, so the only planted link is length -> views
+    rows = [{"age": 100 + (i * 13) % 40, "duration": 200 + 20 * i, "views": 100 + 15 * i} for i in range(40)]
+
+    f = duration_effect(ctx(rows))
+
+    long = next(r for r in f.details["formats"] if r["format"] == "Long-form")
+    assert long["rho"] > 0.9 and "longer videos tend to do better" in f.headline
+
+
+def test_duration_effect_says_no_clear_link_for_noise():
+    rng = np.random.default_rng(6)
+    rows = [{"age": 100 + i, "duration": int(d), "views": float(v)} for i, (d, v) in enumerate(
+            zip(rng.integers(200, 1500, 40), rng.lognormal(6, 0.6, 40), strict=True))]
+
+    assert duration_effect(ctx(rows)).headline.startswith("No clear link")
+
+
+def test_retention_flags_well_viewed_videos_people_leave_early_and_keeps_formats_apart():
+    rows = [{"views": 1000, RETENTION: 60.0, "duration": 600}] * 12
+    rows += [{"views": 9000, RETENTION: 12.0, "duration": 600}]  # watched a lot, abandoned early
+    rows += [{"views": 500, RETENTION: 105.0, "duration": 30}] * 8  # Shorts replay: over 100% is normal
+
+    frame = make_frame(rows)
+    frame[RETENTION] = [r[RETENTION] for r in rows]
+    f = retention(Context(frame, {}, AS_OF, "lifetime"))
+
+    assert f.details["by_format"]["Shorts"]["median_percent_viewed"] == 105.0
+    assert f.details["candidates"][0]["views"] == 9000
+    assert retention(ctx([{"views": 5}] * 3)).strength == "not_enough_data"
+
+
+# ── the report ──────────────────────────────────────────────────────────────
+
+
+def sample_audit(title="Normal video"):
+    findings = run_audit(Context(make_frame([{"age": 40 + i * 9, "views": 100 + i, "impressions": 9000, "ctr": 4.0}
+                                             for i in range(20)]), {}, AS_OF, "lifetime"))
+    for f in findings:
+        for rows in (f.details.get("best"), f.details.get("candidates")):
+            for r in rows or []:
+                r["title"] = title
+    return {"videos": 20, "as_of": AS_OF, "as_of_source": "test", "findings": [f.__dict__ for f in findings]}
+
+
+def test_report_is_self_contained_and_has_every_finding():
+    html = render_html(sample_audit(), "Acme")
+
+    assert html.startswith("<!doctype html>") and "<script" not in html and "http" not in html.split("<style>")[0]
+    assert html.count("<section>") == 8 and "Channel audit: Acme" in html and "Normal video" in html
+
+
+def test_report_escapes_hostile_titles_and_client_names():
+    hostile = '<script>alert("x")</script><img src=x onerror=alert(1)>'
+
+    html = render_html(sample_audit(title=hostile), hostile)
+
+    assert "<script" not in html and "<img" not in html and "&lt;script&gt;" in html
+
+
+def test_report_route_is_a_locked_down_download(api, tmp_path):
+    client_id = upload_channel(api, tmp_path, PROFILES[0])
+
+    response = api.get(f"/api/clients/{client_id}/audit/report")
+
+    assert response.status_code == 200 and response.headers["content-type"].startswith("text/html")
+    assert "attachment" in response.headers["content-disposition"] and "audit-pixel-harbor" in response.headers[
+        "content-disposition"]
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert "default-src 'none'" in response.headers["content-security-policy"]
+    assert "Shorts and long-form" in response.text and "Title features" in response.text
+    assert api.get(f"/api/clients/{uuid.uuid4()}/audit/report").status_code == 404
+
+
+def test_videos_all_the_same_age_cannot_be_age_adjusted():
+    assert performance(ctx([{"age": 120, "views": 100 + i} for i in range(20)])).strength == "not_enough_data"

@@ -63,6 +63,44 @@ function Extra({ finding }) {
   if (finding.key === 'click_through' && d.candidates?.length) {
     return <VideoList rows={d.candidates} columns={ctrColumns} />
   }
+  if (finding.key === 'retention' && d.candidates?.length) {
+    return <VideoList rows={d.candidates} columns={[
+      { label: 'Views', format: r => num(r.views) },
+      { label: 'Average % viewed', format: r => `${r.percent_viewed.toFixed(0)}%` },
+    ]} />
+  }
+  if (finding.key === 'title_features' && d.features) {
+    return (
+      <table className="w-full text-sm mt-3">
+        <thead><tr style={{ color: 'var(--text-muted)' }}>
+          <th className="text-left font-normal pb-1">Title has</th>
+          <th className="text-right font-normal pb-1">Videos with / without</th>
+          <th className="text-right font-normal pb-1">Index ratio</th>
+          <th className="text-right font-normal pb-1">Adjusted p</th>
+        </tr></thead>
+        <tbody>
+          {d.features.map(r => (
+            <tr key={r.feature} className="border-t" style={{ borderColor: 'var(--surface-border)' }}>
+              <td className="py-1.5">{r.feature}</td>
+              <td className="py-1.5 text-right font-mono">{r.n_with} / {r.n_without}</td>
+              <td className="py-1.5 text-right font-mono">{r.ratio == null ? '-' : `${r.ratio.toFixed(2)}x`}</td>
+              <td className="py-1.5 text-right font-mono">{r.p_adjusted == null ? '-' : r.p_adjusted.toFixed(3)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    )
+  }
+  if (finding.key === 'duration' && d.formats) {
+    return (
+      <ul className="mt-3 text-sm space-y-1">
+        {d.formats.map(r => (
+          <li key={r.format}>{r.format} ({r.videos} videos): {r.rho == null ? 'too few to measure'
+            : `rank correlation ${r.rho.toFixed(2)}, 95% range ${r.low.toFixed(2)} to ${r.high.toFixed(2)}`}</li>
+        ))}
+      </ul>
+    )
+  }
   if (finding.key === 'cadence' && d.by_weekday) {
     const max = Math.max(...Object.values(d.by_weekday), 1)
     return (
@@ -117,7 +155,11 @@ export default function Audit() {
   return (
     <div className="animate-fade-in max-w-4xl">
       <PageHeader title="Channel Audit"
-        subtitle={client ? `${client.name}${audit ? ` · ${audit.videos} videos · ages measured to ${audit.as_of}` : ''}` : ''} />
+        subtitle={client ? `${client.name}${audit ? ` · ${audit.videos} videos · ages measured to ${audit.as_of}` : ''}` : ''}>
+        {audit && (
+          <a className="btn btn-ghost" href={`/api${scoped('/audit/report')}`} download>Download report</a>
+        )}
+      </PageHeader>
       {!audit && <Skeleton className="h-40 w-full" />}
       {audit && (
         <>

@@ -3,8 +3,10 @@ import uuid
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import HTMLResponse
 
 import deps
+from audit.report import render_html
 from audit.service import build_audit
 from routers.analysis import make_router
 from routers.clients import SessionDep, _get_client
@@ -93,3 +95,22 @@ def client_audit(client_id: uuid.UUID, session: SessionDep, upload_id: int | Non
         return build_audit(session, client_id, upload_id)
     except NoUpload as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from None
+
+
+@router.get("/audit/report", response_class=HTMLResponse, tags=["audit"])
+def client_audit_report(client_id: uuid.UUID, session: SessionDep, upload_id: int | None = None) -> HTMLResponse:
+    """The audit as one self-contained HTML page (no scripts), downloadable, printable to PDF."""
+    client = _get_client(session, client_id)
+    try:
+        audit = build_audit(session, client_id, upload_id)
+    except NoUpload as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from None
+    name = "".join(c if c.isalnum() else "-" for c in client.name).strip("-").lower() or "client"
+    return HTMLResponse(
+        render_html(audit, client.name),
+        headers={
+            "Content-Disposition": f'attachment; filename="audit-{name}.html"',
+            "X-Content-Type-Options": "nosniff",
+            "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'",
+        },
+    )
