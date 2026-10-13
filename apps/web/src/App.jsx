@@ -2,6 +2,7 @@ import { Routes, Route } from 'react-router-dom'
 import Sidebar from './components/Sidebar'
 import StatusAlerts from './components/StatusAlerts'
 import Dashboard    from './pages/Dashboard'
+import Audit        from './pages/Audit'
 import Heatmap      from './pages/Heatmap'
 import Keywords     from './pages/Keywords'
 import Descriptions from './pages/Descriptions'
@@ -17,6 +18,7 @@ export default function App() {
           <StatusAlerts />
           <Routes>
             <Route path="/"             element={<Dashboard />}    />
+            <Route path="/audit"        element={<Audit />}        />
             <Route path="/heatmap"      element={<Heatmap />}      />
             <Route path="/keywords"     element={<Keywords />}     />
             <Route path="/descriptions" element={<Descriptions />} />

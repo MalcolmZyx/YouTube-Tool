@@ -5,9 +5,10 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, HTTPException
 
 import deps
+from audit.service import build_audit
 from routers.analysis import make_router
 from routers.clients import SessionDep, _get_client
-from schemas import DatasetOut, EnrichOut, PublicDataDeletedOut
+from schemas import AuditOut, DatasetOut, EnrichOut, PublicDataDeletedOut
 from services.client_data import NoUpload, load_table, pick_upload
 from youtube import quota
 from youtube.client import BATCH_SIZE, QuotaExceeded, YouTubeError
@@ -82,3 +83,13 @@ def delete_client_public_data(client_id: uuid.UUID, session: SessionDep) -> Publ
     """Erase the stored YouTube details (tags, descriptions, thumbnails) for this client. The export is kept."""
     _get_client(session, client_id)
     return PublicDataDeletedOut(deleted_videos=delete_public_data(session, client_id))
+
+
+@router.get("/audit", response_model=AuditOut, tags=["audit"])
+def client_audit(client_id: uuid.UUID, session: SessionDep, upload_id: int | None = None) -> dict:
+    """Findings about the channel, with evidence and caveats, computed from the stored export."""
+    _get_client(session, client_id)
+    try:
+        return build_audit(session, client_id, upload_id)
+    except NoUpload as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from None

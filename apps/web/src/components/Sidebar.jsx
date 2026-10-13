@@ -6,6 +6,7 @@ import { useClient } from '../hooks/useClient'
 
 const NAV = [
   { to: '/',            icon: GridIcon,     label: 'Dashboard'   },
+  { to: '/audit',       icon: AuditIcon,    label: 'Audit'       },
   { to: '/heatmap',     icon: CalendarIcon, label: 'Heatmap'     },
   { to: '/keywords',    icon: TagIcon,      label: 'Keywords'    },
   { to: '/descriptions',icon: DocIcon,      label: 'Descriptions'},
@@ -158,6 +159,13 @@ function GridIcon({ size = 16 }) {
       <rect x="9" y="1" width="6" height="6" rx="1.5" fill="currentColor" opacity=".8"/>
       <rect x="1" y="9" width="6" height="6" rx="1.5" fill="currentColor" opacity=".8"/>
       <rect x="9" y="9" width="6" height="6" rx="1.5" fill="currentColor" opacity=".8"/>
+    </svg>
+  )
+}
+function AuditIcon({ size = 16 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
+      <path d="M2 13V9M6 13V5M10 13V7M14 13V2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
     </svg>
   )
 }

@@ -17,6 +17,7 @@ YouTube-Tool/
 │   │   ├── ingest/                   ← export importer: cell parsers, report-type registry, importer
 │   │   ├── intake.py                 ← safe upload handling (size cap, hashing)
 │   │   ├── security.py               ← Origin/Host guards, upload limits, log redaction
+│   │   ├── audit/                    ← the audit engine: findings with evidence and caveats
 │   │   ├── youtube/                  ← batched YouTube client, 30-day store, quota count, expiry alerts
 │   │   ├── synthetic/                ← seeded fake channels in Studio export format
 │   │   ├── db/                       ← SQLAlchemy models, metric catalog + seed data, session
@@ -82,6 +83,7 @@ YouTube-Tool/
 | PUT    | `/api/clients/{id}/uploads/{upload_id}/period` | Confirm the date range an upload covers |
 | POST   | `/api/clients/{id}/enrich`       | Fetch public YouTube details (tags, descriptions, thumbnails) |
 | DELETE | `/api/clients/{id}/public-data`  | Erase a client's stored YouTube details (the export is kept) |
+| GET    | `/api/clients/{id}/audit`        | Audit findings (standouts, rhythm, Shorts vs long-form, click-through) |
 | GET    | `/api/quota`                     | YouTube quota used and left today (our own estimate) |
 | GET    | `/api/public-data/alerts`        | Clients whose stored YouTube data expired or expires within 7 days |
 
@@ -114,7 +116,8 @@ The `/api/clients` routes use it (create a client, upload exports, erase it). Ho
 why: [docs/concepts/data-model.md](docs/concepts/data-model.md); how exports are imported:
 [docs/concepts/importing.md](docs/concepts/importing.md); fake demo data:
 [docs/concepts/synthetic-data.md](docs/concepts/synthetic-data.md); the YouTube API and its 30-day rule:
-[docs/concepts/youtube-api.md](docs/concepts/youtube-api.md).
+[docs/concepts/youtube-api.md](docs/concepts/youtube-api.md); the audit and its statistics:
+[docs/concepts/audit.md](docs/concepts/audit.md).
 
 ### 2. Backend
 
@@ -179,7 +182,8 @@ GitHub Actions runs the same lint and test steps, plus a frontend production bui
 4. **Heatmap** → Switch metrics via the dropdown; view month-by-month and day-of-week charts
 5. **Keywords** → Explore view-weighted tag scores and the top vs bottom performer comparison
 6. **Descriptions** → Search/filter descriptions, see char counts, links, timestamps, hashtags
-7. **Researcher** → Type any query; autocomplete ideas appear as you type; search returns videos + competitor tag scores
+7. **Audit** → Open it for any client: findings with evidence, strength and caveats
+8. **Researcher** → Type any query; autocomplete ideas appear as you type; search returns videos + competitor tag scores
 
 ---
 
