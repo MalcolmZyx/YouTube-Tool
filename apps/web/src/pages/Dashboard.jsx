@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import toast from 'react-hot-toast'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts'
 import { useApi } from '../hooks/useApi'
+import { useClient } from '../hooks/useClient'
 import DataTable from '../components/DataTable'
 import { MetricCard, EmptyState, PageHeader, Select, SkeletonCard, Skeleton } from '../components/ui'
 
@@ -9,23 +10,26 @@ const ACCENT_COLORS = ['#ff3c3c','#ff6b6b','#fbbf24','#4ade80','#60a5fa','#c084f
 
 export default function Dashboard() {
   const { get, upload, loading } = useApi()
+  const { client, clientId, scoped, version, dataChanged } = useClient()
   const [dataset,    setDataset]    = useState(null)
   const [duration,   setDuration]   = useState(null)
   const [durationMetric, setDurationMetric] = useState('Views')
-  const [numRows,    setNumRows]    = useState('')
   const fileRef = useRef()
 
-  // ── Load cached dataset on mount ──────────────────────────────────────
+  // ── Load the selected client's data, and again when it changes ─────────
   useEffect(() => {
-    get('/dashboard')
+    setDataset(null)
+    setDuration(null)
+    if (!clientId) return
+    get(scoped('/dashboard'))
       .then(d => { setDataset(d); fetchDuration('Views', d) })
       .catch(() => {})
-  }, [])  // eslint-disable-line
+  }, [clientId, version])  // eslint-disable-line
 
   const fetchDuration = async (metric, ds = dataset) => {
     if (!ds) return
     try {
-      const d = await get('/duration', { metric })
+      const d = await get(scoped('/duration'), { metric })
       setDuration(d)
     } catch {}
   }
@@ -36,14 +40,14 @@ export default function Dashboard() {
     if (!file) return
     const fd = new FormData()
     fd.append('file', file)
-    if (numRows) fd.append('num_rows', numRows)
 
     toast.loading('Processing file…', { id: 'upload' })
     try {
-      const ds = await upload('/dashboard/upload', fd)
-      setDataset(ds)
-      fetchDuration(durationMetric, ds)
-      toast.success(`Loaded ${ds.rows?.length ?? 0} videos`, { id: 'upload' })
+      const result = await upload(`/clients/${clientId}/uploads`, fd)
+      await dataChanged()
+      const note = result.duplicate ? 'This file was already imported' : `Imported ${result.videos} videos`
+      toast.success(note, { id: 'upload' })
+      result.warnings?.forEach(w => toast(w, { duration: 8000 }))
     } catch (err) {
       toast.error(err.message, { id: 'upload' })
     }
@@ -59,7 +63,7 @@ export default function Dashboard() {
 
   return (
     <div className="animate-fade-in">
-      <PageHeader title="Analytics Dashboard" subtitle="Upload your YouTube Studio export to begin">
+      <PageHeader title="Analytics Dashboard" subtitle={client ? `Client: ${client.name}` : 'Create a client, then upload their YouTube Studio export'}>
         {dataset && (
           <Select
             value={durationMetric}
@@ -71,23 +75,13 @@ export default function Dashboard() {
             className="w-40"
           />
         )}
-        <button className="btn btn-primary" onClick={() => fileRef.current?.click()}>
+        <button className="btn btn-primary" disabled={!clientId} onClick={() => fileRef.current?.click()}>
           <UploadIcon />
           {dataset ? 'Re-upload' : 'Upload File'}
         </button>
         <input ref={fileRef} type="file" accept=".xlsx,.xlsm,.csv"
           className="hidden" onChange={handleUpload} />
       </PageHeader>
-
-      {/* Row limit input */}
-      <div className="flex items-center gap-2 mb-6">
-        <input
-          type="number" placeholder="Row limit (optional)"
-          value={numRows} onChange={e => setNumRows(e.target.value)}
-          className="input w-48" min={1}
-        />
-        <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Leave blank to load all rows</span>
-      </div>
 
       {/* Loading skeleton */}
       {loading && !dataset && (
@@ -101,8 +95,8 @@ export default function Dashboard() {
         <EmptyState
           icon="📊"
           title="No data loaded"
-          desc="Upload an Excel or CSV export from YouTube Studio to see your analytics."
-          action={
+          desc={clientId ? 'Upload an Excel or CSV export from YouTube Studio to see analytics for this client.' : 'Create a client in the sidebar first.'}
+          action={clientId &&
             <button className="btn btn-primary" onClick={() => fileRef.current?.click()}>
               <UploadIcon /> Choose file
             </button>
@@ -117,7 +111,7 @@ export default function Dashboard() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
               <MetricCard accent="red"   label="Videos"     value={stats.totalVideos}   />
               <MetricCard accent="blue"  label="Total Views" value={stats.totalViews}   sub="across all videos" />
-              <MetricCard accent="amber" label="Avg CTR"     value={stats.avgCTR}       sub="click-through rate" />
+              <MetricCard accent="amber" label="CTR"         value={stats.avgCTR}       sub="channel click-through rate" />
               <MetricCard accent="green" label="Avg Views"   value={stats.avgViews}     sub="per video" />
             </div>
           )}
@@ -211,21 +205,29 @@ export default function Dashboard() {
 
 function computeStats(ds) {
   const rows = ds.rows || []
-  const viewsCol = (ds.numeric_columns || []).find(c => c.toLowerCase().includes('view')) || 'Views'
-  const ctrCol   = (ds.percent_columns  || []).find(c => c.toLowerCase().includes('ctr')
+  const numeric = ds.numeric_columns || []
+  // Prefer the column named exactly "Views": "Average view duration" also contains "view".
+  const viewsCol = numeric.find(c => c.toLowerCase() === 'views') || numeric.find(c => c.toLowerCase().includes('view')) || 'Views'
+  const ctrCol   = (ds.percent_columns || []).find(c => c.toLowerCase().includes('ctr')
     || c.toLowerCase().includes('click')) || null
 
-  const totalViews = rows.reduce((s, r) => s + (parseFloat(r[viewsCol]) || 0), 0)
-  const avgViews   = rows.length ? totalViews / rows.length : 0
-  const avgCTR     = ctrCol && rows.length
-    ? rows.reduce((s, r) => s + (parseFloat(r[ctrCol]) || 0), 0) / rows.length
-    : null
+  // The export's Total row is the channel's own figure. It includes views the listed videos do not (deleted
+  // videos and the like), so it is preferred; the sum over videos is the fallback.
+  const totalRow = ds.total_row || {}
+  const videoSum = rows.reduce((s, r) => s + (parseFloat(r[viewsCol]) || 0), 0)
+  const totalViews = parseFloat(totalRow[viewsCol]) || videoSum
+  const avgViews   = rows.length ? videoSum / rows.length : 0
+
+  // A rate must not be averaged across videos: use the Total row's rate, else average only the videos that
+  // reported one (a blank or 0 means "no impressions", not a 0% rate).
+  const reported = ctrCol ? rows.map(r => parseFloat(r[ctrCol])).filter(v => v > 0) : []
+  const ctr = (ctrCol && parseFloat(totalRow[ctrCol])) || (reported.length ? reported.reduce((a, v) => a + v, 0) / reported.length : null)
 
   return {
     totalVideos: rows.length.toLocaleString(),
     totalViews:  totalViews >= 1e6 ? `${(totalViews/1e6).toFixed(1)}M` : totalViews >= 1e3 ? `${(totalViews/1e3).toFixed(0)}K` : totalViews.toFixed(0),
     avgViews:    avgViews   >= 1e3 ? `${(avgViews /1e3).toFixed(1)}K` : avgViews.toFixed(0),
-    avgCTR:      avgCTR !== null ? `${avgCTR.toFixed(1)}%` : 'N/A',
+    avgCTR:      ctr !== null ? `${ctr.toFixed(1)}%` : 'N/A',
   }
 }
 

@@ -1,5 +1,8 @@
 import { NavLink } from 'react-router-dom'
+import { useState } from 'react'
 import clsx from 'clsx'
+import toast from 'react-hot-toast'
+import { useClient } from '../hooks/useClient'
 
 const NAV = [
   { to: '/',            icon: GridIcon,     label: 'Dashboard'   },
@@ -25,6 +28,8 @@ export default function Sidebar() {
           <div className="text-xs" style={{ color: 'var(--text-muted)' }}>Studio</div>
         </div>
       </div>
+
+      <ClientSwitcher />
 
       {/* Nav links */}
       <nav className="flex-1 py-4 space-y-1 px-2 overflow-y-auto">
@@ -52,6 +57,63 @@ export default function Sidebar() {
         v0.2.0 · FastAPI + React
       </div>
     </aside>
+  )
+}
+
+// ── Client switcher ──────────────────────────────────────────────────────
+
+function ClientSwitcher() {
+  const { clients, clientId, client, ready, select, create, remove } = useClient()
+  const [adding, setAdding] = useState(false)
+  const [name,   setName]   = useState('')
+
+  const submit = async e => {
+    e.preventDefault()
+    if (!name.trim()) return
+    try {
+      await create(name.trim())
+      setName('')
+      setAdding(false)
+    } catch (err) { toast.error(err.message) }
+  }
+
+  const erase = async () => {
+    const ok = window.confirm(
+      `Erase "${client.name}" and everything imported for it (${client.upload_count} uploads, `
+      + `${client.video_count} videos)? This cannot be undone.`)
+    if (!ok) return
+    try {
+      const { deleted } = await remove(client.id)
+      toast.success(`Erased ${deleted.videos} videos and ${deleted.metric_values} values`)
+    } catch (err) { toast.error(err.message) }
+  }
+
+  return (
+    <div className="px-3 py-3 border-b space-y-2" style={{ borderColor: 'var(--surface-border)' }}>
+      <div className="text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Client</div>
+      {ready && clients.length > 0 && (
+        <select className="input w-full" value={clientId ?? ''} onChange={e => select(e.target.value)}>
+          {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
+      )}
+      {adding ? (
+        <form onSubmit={submit} className="flex gap-1">
+          <input autoFocus className="input w-full" placeholder="Client name" maxLength={200}
+            value={name} onChange={e => setName(e.target.value)} />
+          <button className="btn btn-primary" type="submit">Add</button>
+        </form>
+      ) : (
+        <div className="flex gap-1">
+          <button className="btn btn-ghost flex-1" onClick={() => setAdding(true)}>+ New</button>
+          {client && <button className="btn btn-ghost" onClick={erase} title="Erase this client and its data">Delete</button>}
+        </div>
+      )}
+      {client && (
+        <div className="text-xs" style={{ color: 'var(--text-muted)' }}>
+          {client.video_count} videos · {client.upload_count} uploads
+        </div>
+      )}
+    </div>
   )
 }
 

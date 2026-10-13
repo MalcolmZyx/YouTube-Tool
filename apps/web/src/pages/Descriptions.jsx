@@ -1,19 +1,22 @@
 import { useState, useEffect } from 'react'
 import { useApi } from '../hooks/useApi'
+import { useClient } from '../hooks/useClient'
 import { PageHeader, EmptyState, Badge, Skeleton } from '../components/ui'
 
 export default function Descriptions() {
   const { get, loading } = useApi()
+  const { clientId, scoped, version } = useClient()
   const [videos,   setVideos]   = useState([])
   const [expanded, setExpanded] = useState({})
   const [search,   setSearch]   = useState('')
   const [filter,   setFilter]   = useState('all')
 
   useEffect(() => {
-    get('/descriptions')
+    if (!clientId) { setVideos([]); return }
+    get(scoped('/descriptions'))
       .then(d => setVideos(d.videos ?? []))
-      .catch(() => {})
-  }, [])  // eslint-disable-line
+      .catch(() => setVideos([]))
+  }, [clientId, version])  // eslint-disable-line
 
   const toggle = id => setExpanded(p => ({ ...p, [id]: !p[id] }))
 

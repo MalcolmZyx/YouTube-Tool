@@ -77,3 +77,28 @@ YouTube API call and a huge file ties up a worker.
 6. Why is the period `unknown` by default, and how does it get set?
 7. What bug did driving the real server reveal, and why could the unit tests not see it?
 8. Which steps add a new report type, and which parts need no change?
+
+## Reading it back: one pipeline, two sources
+
+The analyses (heatmap, duration buckets, keyword scores) were written for a table in memory. Rather than rewrite them,
+`services/client_data.py` rebuilds that table from the database: one row per video, one column per metric (the long
+`video_metric` rows pivoted wide), plus the Total row. `DataService.build_dataset` then does what it always did.
+
+* `routers/analysis.py` is a factory, `make_router(get_dataset)`. The same handlers are mounted twice: once over the old
+  in-memory dataset, once under `/api/clients/{id}/` over the database. The only difference is the dependency that
+  supplies the dataset.
+* Every query carries the `client_id`, so asking for another client's `upload_id` is a 404, never their data.
+* A client can have several uploads (different periods); the default is the most recent, `?upload_id=` picks another.
+
+**Known limitation:** the display pipeline still turns a blank into 0 (a `fillna(0)` from the spreadsheet days), so a
+Short with no impressions shows 0 and drags a mean down. The database keeps the difference; the audit engine will read
+from the database, not from this table. The dashboard's CTR therefore uses the export's own Total-row rate, not an
+average of per-video rates.
+
+**A bug this surfaced:** the KPI card "Total views" picked the first column whose name contains "view", which was
+"Average view duration", so it showed 14K instead of 240K. It now prefers the column named exactly `Views`, and
+prefers the Total row's figures. Ratios (CTR) must be recomputed or taken from the total, never averaged.
+
+### You should be able to explain (additions)
+9. Why mount the same handlers twice instead of copying them, and what differs between the two mounts?
+10. Why can't a per-video CTR be averaged to get the channel's CTR?

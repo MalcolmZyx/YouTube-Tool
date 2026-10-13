@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts'
 import { useApi } from '../hooks/useApi'
+import { useClient } from '../hooks/useClient'
 import { PageHeader, Select, EmptyState, Skeleton } from '../components/ui'
 
 const DOW_COLORS = ['#60a5fa','#4ade80','#fbbf24','#f472b6','#c084fc','#fb923c','#38bdf8']
@@ -61,19 +62,21 @@ const DAY_LABELS  = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
 
 export default function Heatmap() {
   const { get, loading } = useApi()
+  const { clientId, scoped, version } = useClient()
   const [data,   setData]   = useState(null)
   const [metric, setMetric] = useState('Views')
   const [tooltip, setTooltip] = useState(null)
 
   const fetchData = async (m = metric) => {
+    if (!clientId) { setData(null); return }
     try {
-      const d = await get('/heatmap', { metric: m })
+      const d = await get(scoped('/heatmap'), { metric: m })
       setData(d)
       setMetric(m)
     } catch {}
   }
 
-  useEffect(() => { fetchData() }, [])  // eslint-disable-line
+  useEffect(() => { fetchData() }, [clientId, version])  // eslint-disable-line
 
   const months = useMemo(() => buildCalendarMonths(data?.calendar), [data])
   const maxVal  = useMemo(() => Math.max(...(data?.calendar?.map(d => d.value) ?? [0])), [data])
@@ -82,7 +85,7 @@ export default function Heatmap() {
   if (!data && !loading) {
     return (
       <EmptyState icon="📅" title="No data loaded"
-        desc="Upload a file on the Dashboard first." />
+        desc="Pick a client and upload an export on the Dashboard first." />
     )
   }
 

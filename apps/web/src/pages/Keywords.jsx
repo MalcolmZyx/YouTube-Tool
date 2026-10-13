@@ -1,26 +1,29 @@
 import { useState, useEffect } from 'react'
 import { useApi } from '../hooks/useApi'
+import { useClient } from '../hooks/useClient'
 import { TagBar, PageHeader, EmptyState, Skeleton } from '../components/ui'
 
 export default function Keywords() {
   const { get, loading } = useApi()
+  const { clientId, scoped, version } = useClient()
   const [weighted, setWeighted] = useState(null)
   const [tvb,      setTvb]      = useState(null)
   const [topN,     setTopN]     = useState(25)
   const [tab,      setTab]      = useState('weighted')
 
   const load = async () => {
+    if (!clientId) { setWeighted(null); setTvb(null); return }
     try {
       const [w, t] = await Promise.all([
-        get('/keywords/weighted', { top_n: topN }),
-        get('/keywords/top-vs-bottom', { top_n: 20 }),
+        get(scoped('/keywords/weighted'), { top_n: topN }),
+        get(scoped('/keywords/top-vs-bottom'), { top_n: 20 }),
       ])
       setWeighted(w)
       setTvb(t)
     } catch {}
   }
 
-  useEffect(() => { load() }, [])  // eslint-disable-line
+  useEffect(() => { load() }, [clientId, version])  // eslint-disable-line
 
   const noData = !weighted && !tvb && !loading
 
