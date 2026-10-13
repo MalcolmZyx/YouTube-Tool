@@ -1,0 +1,25 @@
+# Local development services. Start with:  docker compose up -d
+#
+# The credentials below are development-only defaults. The port is bound to 127.0.0.1, so the
+# database is reachable from this machine only. Override with POSTGRES_PASSWORD in a root .env file.
+services:
+  postgres:
+    image: postgres:17
+    container_name: yt-studio-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ytstudio
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ytstudio_dev}
+      POSTGRES_DB: ytstudio
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ytstudio -d ytstudio"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  postgres_data:
