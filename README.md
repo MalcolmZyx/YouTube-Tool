@@ -52,6 +52,7 @@ YouTube-Tool/
 │               ├── Descriptions.jsx  ← Per-video description analysis with filters
 │               ├── Researcher.jsx    ← Search, autocomplete ideas, competitor tags
 │               └── Settings.jsx      ← API key management + system status
+├── supabase/                         ← client portal database: config and migrations (local Supabase)
 ├── docs/concepts/                    ← design notes (start with data-model.md)
 ├── docker-compose.yml                ← local Postgres
 ├── .github/workflows/ci.yml          ← lint, tests (with Postgres), audits, frontend build
@@ -118,7 +119,8 @@ why: [docs/concepts/data-model.md](docs/concepts/data-model.md); how exports are
 [docs/concepts/importing.md](docs/concepts/importing.md); fake demo data:
 [docs/concepts/synthetic-data.md](docs/concepts/synthetic-data.md); the YouTube API and its 30-day rule:
 [docs/concepts/youtube-api.md](docs/concepts/youtube-api.md); the audit and its statistics:
-[docs/concepts/audit.md](docs/concepts/audit.md).
+[docs/concepts/audit.md](docs/concepts/audit.md); portal security and how it is tested:
+[docs/concepts/portal-security.md](docs/concepts/portal-security.md).
 
 ### 2. Backend
 
