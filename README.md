@@ -13,7 +13,9 @@ YouTube-Tool/
 │   │   ├── deps.py                   ← Service instances, loaded-dataset cache, request guards
 │   │   ├── errors.py                 ← All failures returned as {"error": "..."}
 │   │   ├── schemas.py                ← Request/response models (pydantic)
-│   │   ├── routers/                  ← system, dashboard, analysis, researcher (12 endpoints)
+│   │   ├── routers/                  ← system, dashboard, analysis, researcher, clients (19 endpoints)
+│   │   ├── ingest/                   ← export importer: cell parsers, report-type registry, importer
+│   │   ├── intake.py                 ← safe upload handling (size cap, hashing)
 │   │   ├── security.py               ← Origin/Host guards, upload limits, log redaction
 │   │   ├── db/                       ← SQLAlchemy models, metric catalog + seed data, session
 │   │   ├── migrations/               ← Alembic migrations (schema history)
@@ -68,6 +70,16 @@ YouTube-Tool/
 | POST   | `/api/researcher/search`         | YouTube search + tag analysis |
 | GET    | `/api/researcher/ideas?topic=X`  | YouTube autocomplete suggestions |
 | GET    | `/api/health`                    | Health check |
+| POST   | `/api/clients`                   | Create a client |
+| GET    | `/api/clients`                   | List clients with upload and video counts |
+| GET    | `/api/clients/{id}`              | One client |
+| DELETE | `/api/clients/{id}`              | Erase a client and everything it owns |
+| POST   | `/api/clients/{id}/uploads`      | Import a Studio export (idempotent per file) |
+| GET    | `/api/clients/{id}/uploads`      | List a client's uploads |
+| PUT    | `/api/clients/{id}/uploads/{upload_id}/period` | Confirm the date range an upload covers |
+
+The client routes store data in Postgres. The older dashboard routes above (`/api/dashboard`, `/api/heatmap`, ...)
+still work on a single in-memory dataset and move to the database in a later step. Interactive docs: `/docs`.
 
 ---
 
@@ -86,8 +98,9 @@ alembic upgrade head                 # create the tables
 python -m db sync-catalog            # load the metric catalog
 ```
 
-The database is not used by the routes yet; it lands with the import pipeline. How it is designed and why:
-[docs/concepts/data-model.md](docs/concepts/data-model.md).
+The `/api/clients` routes use it (create a client, upload exports, erase it). How the database is designed and
+why: [docs/concepts/data-model.md](docs/concepts/data-model.md); how exports are imported:
+[docs/concepts/importing.md](docs/concepts/importing.md).
 
 ### 2. Backend
 
