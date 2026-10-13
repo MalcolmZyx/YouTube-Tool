@@ -17,6 +17,7 @@ YouTube-Tool/
 │   │   ├── ingest/                   ← export importer: cell parsers, report-type registry, importer
 │   │   ├── intake.py                 ← safe upload handling (size cap, hashing)
 │   │   ├── security.py               ← Origin/Host guards, upload limits, log redaction
+│   │   ├── youtube/                  ← batched YouTube client and the 30-day store of public data
 │   │   ├── synthetic/                ← seeded fake channels in Studio export format
 │   │   ├── db/                       ← SQLAlchemy models, metric catalog + seed data, session
 │   │   ├── migrations/               ← Alembic migrations (schema history)
@@ -79,6 +80,7 @@ YouTube-Tool/
 | POST   | `/api/clients/{id}/uploads`      | Import a Studio export (idempotent per file) |
 | GET    | `/api/clients/{id}/uploads`      | List a client's uploads |
 | PUT    | `/api/clients/{id}/uploads/{upload_id}/period` | Confirm the date range an upload covers |
+| POST   | `/api/clients/{id}/enrich`       | Fetch public YouTube details (tags, descriptions, thumbnails) |
 
 Per-client analysis reads the stored export from Postgres. Each of these also exists under
 `/api/clients/{id}/...` (`dashboard`, `heatmap`, `duration`, `keywords/weighted`, `keywords/top-vs-bottom`,
@@ -102,12 +104,14 @@ cd apps/api
 alembic upgrade head                 # create the tables
 python -m db sync-catalog            # load the metric catalog
 python -m synthetic seed             # optional: three fake channels to explore
+python -m youtube purge              # delete YouTube data older than 30 days (run daily)
 ```
 
 The `/api/clients` routes use it (create a client, upload exports, erase it). How the database is designed and
 why: [docs/concepts/data-model.md](docs/concepts/data-model.md); how exports are imported:
 [docs/concepts/importing.md](docs/concepts/importing.md); fake demo data:
-[docs/concepts/synthetic-data.md](docs/concepts/synthetic-data.md).
+[docs/concepts/synthetic-data.md](docs/concepts/synthetic-data.md); the YouTube API and its 30-day rule:
+[docs/concepts/youtube-api.md](docs/concepts/youtube-api.md).
 
 ### 2. Backend
 
