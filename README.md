@@ -14,6 +14,9 @@ YouTube-Tool/
 │   │   ├── errors.py                 ← All failures returned as {"error": "..."}
 │   │   ├── schemas.py                ← Request/response models (pydantic)
 │   │   ├── routers/                  ← system, dashboard, analysis, researcher (12 endpoints)
+│   │   ├── security.py               ← Origin/Host guards, upload limits, log redaction
+│   │   ├── db/                       ← SQLAlchemy models, metric catalog + seed data, session
+│   │   ├── migrations/               ← Alembic migrations (schema history)
 │   │   ├── requirements.txt
 │   │   ├── requirements-dev.txt
 │   │   ├── .env.example
@@ -43,7 +46,9 @@ YouTube-Tool/
 │               ├── Descriptions.jsx  ← Per-video description analysis with filters
 │               ├── Researcher.jsx    ← Search, autocomplete ideas, competitor tags
 │               └── Settings.jsx      ← API key management + system status
-├── .github/workflows/ci.yml          ← lint, tests, frontend build
+├── docs/concepts/                    ← design notes (start with data-model.md)
+├── docker-compose.yml                ← local Postgres
+├── .github/workflows/ci.yml          ← lint, tests (with Postgres), audits, frontend build
 └── pyproject.toml                    ← ruff, pytest and coverage configuration
 ```
 
@@ -70,7 +75,21 @@ YouTube-Tool/
 
 The app is two processes: the FastAPI server (port 5000) and the Vite dev server for the UI (port 5173). Run both, each in its own terminal. The API has no page of its own, so opening `/` on port 5000 shows a 404; open http://localhost:5000/docs for the interactive API documentation instead.
 
-### 1. Backend
+### 1. Database
+
+Postgres runs in Docker (start Docker Desktop first):
+
+```bash
+docker compose up -d                 # from the repository root
+cd apps/api
+alembic upgrade head                 # create the tables
+python -m db sync-catalog            # load the metric catalog
+```
+
+The database is not used by the routes yet; it lands with the import pipeline. How it is designed and why:
+[docs/concepts/data-model.md](docs/concepts/data-model.md).
+
+### 2. Backend
 
 ```bash
 cd apps/api
@@ -91,7 +110,7 @@ python app.py
 # → Runs on http://localhost:5000, API docs at http://localhost:5000/docs
 ```
 
-### 2. Frontend
+### 3. Frontend
 
 ```bash
 cd apps/web
@@ -115,6 +134,11 @@ pip install -r apps/api/requirements-dev.txt
 ruff check .                                    # lint
 pytest --cov=apps/api --cov-report=term-missing   # tests (never call the real YouTube API)
 ```
+
+Database tests need Postgres (`docker compose up -d`); without it they are skipped locally. They use a
+throw-away `ytstudio_test` database built from the real migrations and never touch your development data.
+After changing `db/models.py`, create a migration with `alembic revision --autogenerate -m "message"` (from
+`apps/api`), read it, and commit it; a test fails if the models and migrations disagree.
 
 GitHub Actions runs the same lint and test steps, plus a frontend production build and `npm audit`, on every pull request.
 
