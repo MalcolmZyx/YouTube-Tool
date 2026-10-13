@@ -76,6 +76,25 @@ class PublicDataDeletedOut(BaseModel):
     deleted_videos: int
 
 
+class FindingOut(BaseModel):
+    key: str
+    title: str
+    headline: str
+    strength: str  # solid | suggestive | weak | not_enough_data | info
+    details: dict[str, Any]
+    caveats: list[str]
+
+
+class AuditOut(BaseModel):
+    upload_id: int
+    filename: str
+    period_kind: str
+    as_of: date
+    as_of_source: str
+    videos: int
+    findings: list[FindingOut]
+
+
 # ── analysis ────────────────────────────────────────────────────────────────
 
 
