@@ -19,6 +19,8 @@ select = [
 [tool.ruff.lint.per-file-ignores]
 # Generated migrations contain long constraint expressions.
 "apps/api/migrations/versions/*.py" = ["E501", "W291"]
+# One-line SQL statements read better than wrapped ones in the isolation tests.
+"apps/api/tests/test_portal_rls.py" = ["E501"]
 
 [tool.coverage.run]
 omit = ["apps/api/tests/*", "apps/api/venv/*", "apps/api/migrations/*"]
