@@ -2,8 +2,10 @@
 from typing import Annotated, Any
 
 from fastapi import Depends, HTTPException
+from sqlalchemy.orm import Session
 
 from config import get_api_key
+from db.session import get_session
 from services.analytics_service import (
     DataService,
     DescriptionService,
@@ -41,5 +43,9 @@ def require_api_key() -> str:
     return key
 
 
+# scope="function" makes get_session commit (or roll back) BEFORE the response is sent. With the default
+# scope the commit would run after the response, so a client could be told "deleted" and read the old
+# data straight back, and a failed commit would never reach the client at all.
+SessionDep = Annotated[Session, Depends(get_session, scope="function")]
 Dataset = Annotated[dict[str, Any], Depends(get_dataset)]
 ApiKey = Annotated[str, Depends(require_api_key)]

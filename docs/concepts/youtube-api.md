@@ -21,6 +21,34 @@ The Researcher page also uses it (`search.list`) for competitor tags; that data 
 | Route | `POST /api/clients/{id}/enrich` | fetch what is missing or stale (429 on quota, 502 on other API failures) |
 | Command | `python -m youtube refresh <client_id>` | the same from the terminal |
 
+## Quota: what is left today
+
+YouTube's API **does not tell us** the remaining quota, so the app counts what it spends (`youtube/quota.py`, table
+`api_usage`) and the sidebar shows it: `7,699 of 10,000 units left`, a bar, and the time until the reset.
+
+* **The period is one day**, and YouTube's day is **Pacific time**, resetting at midnight there. Postgres works that out
+  (it knows the time-zone rules), so it is right across daylight-saving changes.
+* **Costs counted:** a batch of up to 50 videos is 1 unit; a Researcher search is 100 (+1 for its details call).
+* **It is an estimate.** It cannot see other uses of the same key (another script, the Google console's own tests), so
+  the hover text says so. If YouTube ever answers "quota exceeded", today's count is set to the full limit, so the meter
+  agrees with reality and no more calls are made until the reset.
+* **Before fetching,** the app compares the cost with what is left and refuses with a clear message instead of failing
+  halfway. The limit is `YOUTUBE_DAILY_QUOTA` in `.env` (default 10,000) in case Google raises it.
+* The hover text also shows the last 7 days of use.
+
+## Stored data that needs attention (manual for now)
+
+Refreshing and deleting are **manual** until the automation phase, so the app tells you when to act. A banner at the top
+of every page appears for any client whose stored YouTube data
+
+* **expires within 7 days** (amber), or
+* **has expired** (red): it is already hidden from Keywords and Descriptions, only the cleanup is outstanding.
+
+The banner has **Refresh now** (fetches again and renews the 30 days) and **Delete YouTube data** (erases that client's
+tags, descriptions and thumbnails after a confirmation; the exported figures stay). Routes: `GET /api/public-data/alerts`,
+`POST /api/clients/{id}/enrich`, `DELETE /api/clients/{id}/public-data`. `python -m youtube purge` still exists for
+deleting everything expired at once.
+
 ## Rules it follows (YouTube Developer Policies)
 
 * **Public data is kept at most 30 days** (III.E.4.d): `expires_at` on every row; analyses ignore expired rows even
@@ -34,7 +62,7 @@ The Researcher page also uses it (`search.list`) for competitor tags; that data 
 
 * The exact wording of **III.E.4.h** (derived metrics): keyword scores are computed from API tags. To be read in full
   and settled before this goes beyond private use.
-* **Quota accounting** per client and a daily budget; **scheduling** the purge (Task Scheduler or cron, Phase 5).
+* A **per-client** quota budget (the meter is for the whole key); **scheduling** the refresh and purge (Task Scheduler or cron, Phase 5).
 * **Clients using their own API key**: judged a poor fit for the credential rules; alternatives are a per-client quota
   on our key, or OAuth "connect my channel" for private data.
 * **Comments** (`commentThreads.list`) and how long their text may be kept.
@@ -46,3 +74,5 @@ The Researcher page also uses it (`search.list`) for competitor tags; that data 
 3. What happens to API data after 30 days, and what three things make sure of it?
 4. Why must an error message never include the request URL?
 5. Why is a client's own API key a problem for a shared app?
+6. The API does not report remaining quota. How do we know what is left, and why is it only an estimate?
+7. Why is the quota day computed in the database, in Pacific time?

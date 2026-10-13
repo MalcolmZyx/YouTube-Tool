@@ -7,10 +7,12 @@ from fastapi import APIRouter, Depends, HTTPException
 import deps
 from routers.analysis import make_router
 from routers.clients import SessionDep, _get_client
-from schemas import DatasetOut, EnrichOut
+from schemas import DatasetOut, EnrichOut, PublicDataDeletedOut
 from services.client_data import NoUpload, load_table, pick_upload
-from youtube.client import QuotaExceeded, YouTubeError
-from youtube.store import load_public_data, refresh_client
+from youtube import quota
+from youtube.client import BATCH_SIZE, QuotaExceeded, YouTubeError
+from youtube.status import delete_public_data
+from youtube.store import load_public_data, refresh_client, videos_due
 
 
 def get_client_dataset(client_id: uuid.UUID, session: SessionDep, upload_id: int | None = None) -> dict[str, Any]:
@@ -57,10 +59,26 @@ def enrich_client(client_id: uuid.UUID, session: SessionDep, api_key: deps.ApiKe
     expires after 30 days (YouTube's rule for public data); see youtube/store.py.
     """
     _get_client(session, client_id)
+    needed = -(-len(videos_due(session, client_id, force)) // BATCH_SIZE) * quota.COST_VIDEOS_LIST  # ceil division
+    left = quota.get_status(session).remaining
+    if needed > left:
+        raise HTTPException(
+            status_code=429, detail=f"Not enough YouTube quota left today (needs about {needed} units, {left} left)."
+        )
     try:
         result = refresh_client(session, client_id, api_key, force=force)
     except QuotaExceeded as exc:
+        quota.mark_exhausted(session)
+        session.commit()  # the error below would otherwise roll this back
         raise HTTPException(status_code=429, detail=str(exc)) from None
     except YouTubeError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from None
+    quota.record(session, needed)
     return EnrichOut(requested=result.requested, stored=result.stored, unavailable=result.unavailable)
+
+
+@router.delete("/public-data", response_model=PublicDataDeletedOut, tags=["clients"])
+def delete_client_public_data(client_id: uuid.UUID, session: SessionDep) -> PublicDataDeletedOut:
+    """Erase the stored YouTube details (tags, descriptions, thumbnails) for this client. The export is kept."""
+    _get_client(session, client_id)
+    return PublicDataDeletedOut(deleted_videos=delete_public_data(session, client_id))

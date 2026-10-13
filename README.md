@@ -17,7 +17,7 @@ YouTube-Tool/
 │   │   ├── ingest/                   ← export importer: cell parsers, report-type registry, importer
 │   │   ├── intake.py                 ← safe upload handling (size cap, hashing)
 │   │   ├── security.py               ← Origin/Host guards, upload limits, log redaction
-│   │   ├── youtube/                  ← batched YouTube client and the 30-day store of public data
+│   │   ├── youtube/                  ← batched YouTube client, 30-day store, quota count, expiry alerts
 │   │   ├── synthetic/                ← seeded fake channels in Studio export format
 │   │   ├── db/                       ← SQLAlchemy models, metric catalog + seed data, session
 │   │   ├── migrations/               ← Alembic migrations (schema history)
@@ -81,6 +81,9 @@ YouTube-Tool/
 | GET    | `/api/clients/{id}/uploads`      | List a client's uploads |
 | PUT    | `/api/clients/{id}/uploads/{upload_id}/period` | Confirm the date range an upload covers |
 | POST   | `/api/clients/{id}/enrich`       | Fetch public YouTube details (tags, descriptions, thumbnails) |
+| DELETE | `/api/clients/{id}/public-data`  | Erase a client's stored YouTube details (the export is kept) |
+| GET    | `/api/quota`                     | YouTube quota used and left today (our own estimate) |
+| GET    | `/api/public-data/alerts`        | Clients whose stored YouTube data expired or expires within 7 days |
 
 Per-client analysis reads the stored export from Postgres. Each of these also exists under
 `/api/clients/{id}/...` (`dashboard`, `heatmap`, `duration`, `keywords/weighted`, `keywords/top-vs-bottom`,

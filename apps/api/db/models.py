@@ -284,3 +284,20 @@ class UploadTotal(Base):
         ),
         CheckConstraint("abs(value) < 'Infinity'::float8", name="value_finite"),
     )
+
+
+class ApiUsage(Base):
+    """YouTube API quota units this app has spent, per day.
+
+    The API does not report remaining quota, so we count it ourselves. The day is YouTube's quota day (Pacific
+    time, resetting at midnight there), not the calendar day where the server runs. It is not tied to a client:
+    quota belongs to the API key.
+    """
+
+    __tablename__ = "api_usage"
+
+    day: Mapped[date] = mapped_column(Date, primary_key=True)
+    units: Mapped[int] = mapped_column(Integer, server_default="0")
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (CheckConstraint("units >= 0", name="units_not_negative"),)
