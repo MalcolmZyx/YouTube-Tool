@@ -17,6 +17,7 @@ YouTube-Tool/
 │   │   ├── ingest/                   ← export importer: cell parsers, report-type registry, importer
 │   │   ├── intake.py                 ← safe upload handling (size cap, hashing)
 │   │   ├── security.py               ← Origin/Host guards, upload limits, log redaction
+│   │   ├── synthetic/                ← seeded fake channels in Studio export format
 │   │   ├── db/                       ← SQLAlchemy models, metric catalog + seed data, session
 │   │   ├── migrations/               ← Alembic migrations (schema history)
 │   │   ├── requirements.txt
@@ -96,11 +97,13 @@ docker compose up -d                 # from the repository root
 cd apps/api
 alembic upgrade head                 # create the tables
 python -m db sync-catalog            # load the metric catalog
+python -m synthetic seed             # optional: three fake channels to explore
 ```
 
 The `/api/clients` routes use it (create a client, upload exports, erase it). How the database is designed and
 why: [docs/concepts/data-model.md](docs/concepts/data-model.md); how exports are imported:
-[docs/concepts/importing.md](docs/concepts/importing.md).
+[docs/concepts/importing.md](docs/concepts/importing.md); fake demo data:
+[docs/concepts/synthetic-data.md](docs/concepts/synthetic-data.md).
 
 ### 2. Backend
 
