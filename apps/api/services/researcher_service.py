@@ -103,9 +103,11 @@ class ResearcherService:
         """
         if not topic:
             return []
-        url = f"https://suggestqueries.google.com/complete/search?client=youtube&q={topic}"
+        # Passing the topic via `params` URL-encodes it. Formatting it into the URL string would let
+        # a topic like "x&client=other" inject extra query parameters.
+        url = "https://suggestqueries.google.com/complete/search"
         try:
-            r = requests.get(url, timeout=8)
+            r = requests.get(url, params={"client": "youtube", "q": topic}, timeout=8)
             r.raise_for_status()
             text = r.text
             match = re.search(r"\((.*)\)", text)

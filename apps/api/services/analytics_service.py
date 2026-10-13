@@ -13,6 +13,11 @@ import numpy as np
 import pandas as pd
 import requests
 
+
+class ExportTooLargeError(ValueError):
+    """The uploaded export has more videos than the configured limit."""
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -79,9 +84,14 @@ class DataService:
     # columns that are never shown in the main table
     _HIDDEN = {"thumbnail_url", "video_description", "video_title", "Video publish time"}
 
-    def load_file(self, file_path: str, api_key: str = "", num_rows: int | None = None) -> dict:
+    def load_file(
+        self, file_path: str, api_key: str = "", num_rows: int | None = None, max_rows: int | None = None
+    ) -> dict:
         """
         Load a spreadsheet and return a JSON-serialisable dict ready for the frontend.
+
+        `max_rows` caps how many videos may be processed. Each video triggers a YouTube API call
+        when a key is configured, so an unbounded file could burn the daily quota or run for hours.
         """
         if file_path.endswith((".xlsx", ".xlsm")):
             df = pd.read_excel(file_path, engine="openpyxl")
@@ -97,6 +107,12 @@ class DataService:
 
         if num_rows:
             df = df.head(num_rows)
+
+        if max_rows is not None and len(df) > max_rows:
+            raise ExportTooLargeError(
+                f"This export has {len(df):,} videos; the limit is {max_rows:,}. "
+                "Use the row limit field to process fewer."
+            )
 
         df = df.dropna(how="all").dropna(axis=1, how="all").fillna("")
 

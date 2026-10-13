@@ -4,10 +4,8 @@ Run from apps/api:
     python app.py                                  # honours DEBUG / PORT from the environment
     uvicorn app:app --reload --port 5000           # equivalent, explicit
 
-Interactive API docs are served at /docs while the server runs.
+Interactive API docs are served at /docs while the server runs (unless DOCS_ENABLED=false).
 """
-import logging
-
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -15,14 +13,20 @@ from fastapi.middleware.cors import CORSMiddleware
 from config import settings
 from errors import register_error_handlers
 from routers import analysis, dashboard, researcher, system
+from security import configure_logging, register_security
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+configure_logging()
 
 app = FastAPI(
     title="YT Analytics Studio API",
     version="0.2.0",
     description="Analyse YouTube Studio exports and research YouTube search results.",
+    docs_url="/docs" if settings.docs_enabled else None,
+    redoc_url=None,
+    openapi_url="/openapi.json" if settings.docs_enabled else None,
 )
+
+register_security(app)
 
 # The browser normally reaches the API through the Vite dev-server proxy (same origin), so CORS
 # only matters for direct calls, and only the configured origins are allowed.
