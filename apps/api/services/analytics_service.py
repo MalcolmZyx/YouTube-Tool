@@ -114,6 +114,13 @@ class DataService:
                 "Use the row limit field to process fewer."
             )
 
+        return self.build_dataset(df, total_row, api_key)
+
+    def build_dataset(self, df: pd.DataFrame, total_row: pd.Series | None, api_key: str = "") -> dict:
+        """Turn a table of videos (first column = video ID) into the dict the frontend and analyses use.
+
+        The table can come from a spreadsheet or from the database; the rest of the pipeline does not care.
+        """
         df = df.dropna(how="all").dropna(axis=1, how="all").fillna("")
 
         # ── Detect the video-ID column ──────────────────────────────────────

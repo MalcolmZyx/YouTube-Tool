@@ -13,7 +13,7 @@ YouTube-Tool/
 │   │   ├── deps.py                   ← Service instances, loaded-dataset cache, request guards
 │   │   ├── errors.py                 ← All failures returned as {"error": "..."}
 │   │   ├── schemas.py                ← Request/response models (pydantic)
-│   │   ├── routers/                  ← system, dashboard, analysis, researcher, clients (19 endpoints)
+│   │   ├── routers/                  ← system, dashboard, analysis, researcher, clients, client_data
 │   │   ├── ingest/                   ← export importer: cell parsers, report-type registry, importer
 │   │   ├── intake.py                 ← safe upload handling (size cap, hashing)
 │   │   ├── security.py               ← Origin/Host guards, upload limits, log redaction
@@ -24,6 +24,7 @@ YouTube-Tool/
 │   │   ├── requirements-dev.txt
 │   │   ├── .env.example
 │   │   ├── services/
+│   │   │   ├── client_data.py        ← a client's stored export read back as a table
 │   │   │   ├── analytics_service.py  ← DataService, HeatmapService, KeywordService,
 │   │   │   │                            DurationService, DescriptionService
 │   │   │   └── researcher_service.py ← ResearcherService (search, autocomplete, tag analysis)
@@ -79,8 +80,11 @@ YouTube-Tool/
 | GET    | `/api/clients/{id}/uploads`      | List a client's uploads |
 | PUT    | `/api/clients/{id}/uploads/{upload_id}/period` | Confirm the date range an upload covers |
 
-The client routes store data in Postgres. The older dashboard routes above (`/api/dashboard`, `/api/heatmap`, ...)
-still work on a single in-memory dataset and move to the database in a later step. Interactive docs: `/docs`.
+Per-client analysis reads the stored export from Postgres. Each of these also exists under
+`/api/clients/{id}/...` (`dashboard`, `heatmap`, `duration`, `keywords/weighted`, `keywords/top-vs-bottom`,
+`descriptions`), with an optional `?upload_id=` (default: the client's latest upload). The UI uses only these.
+The unprefixed routes in the table (`/api/dashboard`, `/api/heatmap`, ...) are the older single in-memory dataset
+and will be removed. Keywords and descriptions are empty until YouTube API data is stored. Interactive docs: `/docs`.
 
 ---
 
@@ -162,8 +166,8 @@ GitHub Actions runs the same lint and test steps, plus a frontend production bui
 
 ## Workflow
 
-1. **Settings** → Enter your YouTube Data API key
-2. **Dashboard** → Upload your YouTube Studio `.xlsx` export (Advanced mode, "Table data")
+1. **Sidebar** → Create a client (or pick one; `python -m synthetic seed` adds three fake ones)
+2. **Dashboard** → Upload that client's YouTube Studio `.xlsx` or `.csv` export (Advanced mode, "Table data")
 3. **Dashboard** → Browse the sortable table with thumbnails; drag column headers to reorder
 4. **Heatmap** → Switch metrics via the dropdown; view month-by-month and day-of-week charts
 5. **Keywords** → Explore view-weighted tag scores and the top vs bottom performer comparison

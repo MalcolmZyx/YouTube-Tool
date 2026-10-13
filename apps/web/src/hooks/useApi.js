@@ -28,5 +28,7 @@ export function useApi() {
     headers: { 'Content-Type': 'multipart/form-data' },
   }), [request])
 
-  return { get, post, upload, loading, error }
+  const del = useCallback(path => request('delete', path), [request])
+
+  return { get, post, del, upload, loading, error }
 }

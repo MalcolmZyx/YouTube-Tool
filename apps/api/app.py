@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from config import settings
 from errors import register_error_handlers
-from routers import analysis, clients, dashboard, researcher, system
+from routers import analysis, client_data, clients, dashboard, researcher, system
 from security import configure_logging, register_security
 
 configure_logging()
@@ -39,7 +39,7 @@ app.add_middleware(
 
 register_error_handlers(app)
 
-for module in (system, dashboard, analysis, researcher, clients):
+for module in (system, dashboard, analysis, researcher, clients, client_data):
     app.include_router(module.router, prefix="/api")
 
 
