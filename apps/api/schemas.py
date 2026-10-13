@@ -3,9 +3,11 @@
 These double as the API contract: FastAPI validates incoming data against them, filters
 outgoing data through them and publishes them in the generated OpenAPI docs (/docs).
 """
+import uuid
+from datetime import date, datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 # ── settings / health ───────────────────────────────────────────────────────
 
@@ -150,3 +152,84 @@ class SearchOut(BaseModel):
 class IdeasOut(BaseModel):
     ideas: list[str]
     topic: str
+
+
+# ── clients and uploads ─────────────────────────────────────────────────────
+
+
+class ClientIn(BaseModel):
+    name: str = Field(max_length=200)
+    youtube_channel_id: str | None = Field(default=None, pattern=r"^UC[A-Za-z0-9_-]{22}$")
+    notes: str | None = Field(default=None, max_length=2000)
+
+    @field_validator("name")
+    @classmethod
+    def _name_not_blank(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("must not be blank")
+        return value
+
+
+class ClientOut(BaseModel):
+    id: uuid.UUID
+    name: str
+    youtube_channel_id: str | None
+    notes: str | None
+    created_at: datetime
+    upload_count: int
+    video_count: int
+
+
+class ClientDeletedOut(BaseModel):
+    """What was erased with the client, so the confirmation can say exactly what is gone."""
+
+    deleted: dict[str, int]
+
+
+class PeriodIn(BaseModel):
+    """The date range an upload covers, as confirmed by the person who knows (the operator)."""
+
+    kind: Literal["lifetime", "range"]
+    start: date | None = None
+    end: date | None = None
+
+    @model_validator(mode="after")
+    def _dates_match_kind(self) -> "PeriodIn":
+        if self.kind == "range":
+            if self.start is None or self.end is None:
+                raise ValueError("a range needs both start and end")
+            if self.start > self.end:
+                raise ValueError("start must not be after end")
+        elif self.start is not None or self.end is not None:
+            raise ValueError("lifetime takes no dates")
+        return self
+
+
+class UploadOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    report_type: str
+    original_filename: str
+    row_count: int
+    period_kind: str
+    period_start: date | None
+    period_end: date | None
+    period_source: str | None
+    exported_on: date | None
+    imported_at: datetime
+
+
+class ImportOut(BaseModel):
+    upload_id: int
+    duplicate: bool
+    videos: int
+    metric_values: int
+    total_values: int
+    period_kind: str
+    period_start: date | None
+    period_end: date | None
+    period_source: str | None
+    new_unreviewed_metrics: list[str]
+    warnings: list[str]
