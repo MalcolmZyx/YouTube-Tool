@@ -16,8 +16,12 @@ select = [
     "UP",       # pyupgrade
 ]
 
+[tool.ruff.lint.per-file-ignores]
+# Generated migrations contain long constraint expressions.
+"apps/api/migrations/versions/*.py" = ["E501", "W291"]
+
 [tool.coverage.run]
-omit = ["apps/api/tests/*", "apps/api/venv/*"]
+omit = ["apps/api/tests/*", "apps/api/venv/*", "apps/api/migrations/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["apps/api/tests"]

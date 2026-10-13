@@ -1,0 +1,69 @@
+key,display_name,family,unit,aggregation,numerator_key,denominator_key,weight_key,description
+views,Views,overview,count,sum,,,,
+engaged_views,Engaged views,overview,count,sum,,,,
+watch_time_hours,Watch time (hours),overview,hours,sum,,,,
+subscribers_net,Subscribers,overview,count,sum,,,,Net change: gained minus lost. Can be negative.
+videos_added,Videos added,overview,count,sum,,,,
+videos_published,Videos published,overview,count,sum,,,,
+impressions,Impressions,reach,count,sum,,,,Thumbnail impressions.
+stayed_to_watch_pct,Stayed to watch (%),reach,percent,none,,,,Not recomputable from other metrics.
+unique_viewers,Unique viewers,reach,count,none,,,,Not additive: a viewer can appear in many videos.
+unique_reach,Unique reach,reach,count,none,,,,Not additive.
+views_co_viewed,Views (co-viewed),reach,count,sum,,,,
+avg_views_per_viewer,Average views per viewer,reach,ratio,none,,,,
+new_viewers,New viewers,reach,count,none,,,,Not additive.
+returning_viewers,Returning viewers,reach,count,none,,,,Not additive.
+casual_viewers,Casual viewers,reach,count,none,,,,Not additive.
+regular_viewers,Regular viewers,reach,count,none,,,,Not additive.
+hypes,Hypes,interactions,count,sum,,,,
+hype_points,Hype points,interactions,count,sum,,,,
+subscribers_gained,Subscribers gained,interactions,count,sum,,,,
+subscribers_lost,Subscribers lost,interactions,count,sum,,,,
+likes,Likes,interactions,count,sum,,,,
+dislikes,Dislikes,interactions,count,sum,,,,
+likes_vs_dislikes_pct,Likes (vs. dislikes) (%),interactions,percent,none,,,,Recompute from likes and dislikes when combining videos.
+shares,Shares,interactions,count,sum,,,,
+comments_added,Comments added,interactions,count,sum,,,,
+total_sales_usd,Total sales (USD),shopping,usd,sum,,,,
+orders,Orders,shopping,count,sum,,,,
+approved_commissions_usd,Approved commissions (USD),shopping,usd,sum,,,,
+pending_commissions_usd,Pending commissions (USD),shopping,usd,sum,,,,
+returned_products_usd,Returned products (USD),shopping,usd,sum,,,,
+youtube_premium_views,YouTube Premium views,premium,count,sum,,,,
+youtube_premium_watch_time_minutes,YouTube Premium watch time (minutes),premium,minutes,sum,,,,
+playlist_watch_time_hours,Playlist watch time (hours),playlists,hours,sum,,,,
+views_from_playlist,Views from playlist,playlists,count,sum,,,,
+playlist_avg_view_duration_seconds,Playlist average view duration,playlists,seconds,none,,,,
+playlist_avg_percentage_viewed_pct,Playlist average percentage viewed,playlists,percent,none,,,,
+playlist_starts,Playlist starts,playlists,count,sum,,,,
+playlist_exits,Playlist exits,playlists,count,sum,,,,
+playlist_exit_rate_pct,Playlist exit rate,playlists,percent,none,,,,
+avg_time_in_playlist_seconds,Average time in playlist,playlists,seconds,none,,,,
+playlist_saves,Playlist saves,playlists,count,sum,,,,
+hours_streamed,Hours streamed,live,hours,sum,,,,
+reminders_set,Reminders set,live,count,sum,,,,
+chat_messages,Chat messages,live,count,sum,,,,
+reactions,Reactions,live,count,sum,,,,
+post_impressions,Post impressions,posts,count,sum,,,,
+post_likes,Post likes,posts,count,sum,,,,
+post_like_rate_pct,Post like rate,posts,percent,none,,,,
+post_responses,Post responses,posts,count,sum,,,,
+post_response_rate_pct,Post response rate,posts,percent,none,,,,
+post_subscribers,Post subscribers,posts,count,sum,,,,
+remix_count,Remix count,remix,count,sum,,,,
+remix_views,Remix views,remix,count,sum,,,,
+community_clip_views,Community clip views,clips,count,sum,,,,
+community_clip_watch_time_hours,Watch time from community clips (hours),clips,hours,sum,,,,
+card_clicks,Card clicks,cards,count,sum,,,,
+cards_shown,Cards shown,cards,count,sum,,,,
+card_teaser_clicks,Card teaser clicks,cards,count,sum,,,,
+card_teasers_shown,Card teasers shown,cards,count,sum,,,,
+end_screen_element_clicks,End screen element clicks,endscreens,count,sum,,,,
+end_screen_elements_shown,End screen elements shown,endscreens,count,sum,,,,
+avg_view_duration_seconds,Average view duration,overview,seconds,weighted_avg,,,views,Weighted by views.
+avg_percentage_viewed_pct,Average percentage viewed (%),overview,percent,weighted_avg,,,views,Weighted by views.
+impressions_ctr_pct,Impressions click-through rate (%),reach,percent,weighted_avg,,,impressions,Weighted by impressions.
+views_per_playlist_start,Views per playlist start,playlists,ratio,ratio,views_from_playlist,playlist_starts,,
+clicks_per_card_shown_pct,Clicks per card shown (%),cards,percent,ratio,card_clicks,cards_shown,,
+teaser_clicks_per_teaser_shown_pct,Teaser clicks per card teaser shown (%),cards,percent,ratio,card_teaser_clicks,card_teasers_shown,,
+end_screen_clicks_per_element_shown_pct,Clicks per end screen element shown (%),endscreens,percent,ratio,end_screen_element_clicks,end_screen_elements_shown,,

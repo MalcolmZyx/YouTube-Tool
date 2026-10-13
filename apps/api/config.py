@@ -37,6 +37,8 @@ class Settings(BaseSettings):
     # bounds the number of YouTube API calls one upload can trigger.
     max_upload_mb: int = 5
     max_rows: int = 5000
+    # SQLAlchemy URL for Postgres. The default matches docker-compose.yml (development only).
+    database_url: str = "postgresql+psycopg://ytstudio:ytstudio_dev@127.0.0.1:5432/ytstudio"
 
     @property
     def cors_origin_list(self) -> list[str]:

@@ -1,0 +1,16 @@
+alias,metric_key
+thumbnail impressions,impressions
+impressions click-through rate,impressions_ctr_pct
+thumbnail click-through rate,impressions_ctr_pct
+thumbnail click-through rate (%),impressions_ctr_pct
+stayed to watch,stayed_to_watch_pct
+likes (vs. dislikes),likes_vs_dislikes_pct
+average percentage viewed,avg_percentage_viewed_pct
+average view duration (seconds),avg_view_duration_seconds
+playlist exit rate (%),playlist_exit_rate_pct
+post like rate (%),post_like_rate_pct
+post response rate (%),post_response_rate_pct
+clicks per card shown,clicks_per_card_shown_pct
+teaser clicks per card teaser shown,teaser_clicks_per_teaser_shown_pct
+clicks per end screen element shown,end_screen_clicks_per_element_shown_pct
+playlist average percentage viewed (%),playlist_avg_percentage_viewed_pct
