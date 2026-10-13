@@ -47,6 +47,12 @@ class DatasetOut(BaseModel):
     video_id_col: str
 
 
+class EnrichOut(BaseModel):
+    requested: int  # videos that needed public data
+    stored: int
+    unavailable: int  # private, deleted or unknown on YouTube
+
+
 # ── analysis ────────────────────────────────────────────────────────────────
 
 

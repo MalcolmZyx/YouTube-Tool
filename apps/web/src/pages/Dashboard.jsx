@@ -9,7 +9,7 @@ import { MetricCard, EmptyState, PageHeader, Select, SkeletonCard, Skeleton } fr
 const ACCENT_COLORS = ['#ff3c3c','#ff6b6b','#fbbf24','#4ade80','#60a5fa','#c084fc','#f472b6']
 
 export default function Dashboard() {
-  const { get, upload, loading } = useApi()
+  const { get, post, upload, loading } = useApi()
   const { client, clientId, scoped, version, dataChanged } = useClient()
   const [dataset,    setDataset]    = useState(null)
   const [duration,   setDuration]   = useState(null)
@@ -53,6 +53,21 @@ export default function Dashboard() {
     }
   }
 
+  // Fetch public YouTube details (description, tags, thumbnail); needs the API key from Settings.
+  const handleEnrich = async () => {
+    toast.loading('Fetching YouTube details…', { id: 'enrich' })
+    try {
+      const r = await post(`/clients/${clientId}/enrich`)
+      await dataChanged()
+      toast.success(
+        r.requested === 0 ? 'Details are already up to date'
+          : `Fetched ${r.stored} videos${r.unavailable ? `, ${r.unavailable} not public` : ''}`,
+        { id: 'enrich' })
+    } catch (err) {
+      toast.error(err.message, { id: 'enrich' })
+    }
+  }
+
   const handleMetricChange = val => {
     setDurationMetric(val)
     fetchDuration(val)
@@ -74,6 +89,11 @@ export default function Dashboard() {
             ].map(c => ({ value: c, label: c }))}
             className="w-40"
           />
+        )}
+        {dataset && (
+          <button className="btn btn-ghost" onClick={handleEnrich} title="Fetch tags, descriptions and thumbnails from YouTube">
+            Fetch YouTube details
+          </button>
         )}
         <button className="btn btn-primary" disabled={!clientId} onClick={() => fileRef.current?.click()}>
           <UploadIcon />
