@@ -2,7 +2,7 @@
 
 [tool.ruff]
 line-length = 120
-target-version = "py311"
+target-version = "py313"
 # Import root of the API, so local modules (config, deps, schemas, ...) sort as first-party.
 src = ["apps/api"]
 extend-exclude = ["apps/api/venv", "apps/web"]

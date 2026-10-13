@@ -11,6 +11,7 @@ from alembic.autogenerate import compare_metadata
 from alembic.migration import MigrationContext
 from sqlalchemy import func, select
 from sqlalchemy.exc import DBAPIError
+from studio_fixtures import STUDIO_METRIC_HEADERS
 
 from db.base import Base
 from db.catalog import find_metric_key, get_or_register_metric, normalize_header, sync_metric_catalog
@@ -337,22 +338,6 @@ def test_every_ratio_and_weight_points_at_a_seeded_metric(catalog_session):
     for metric in catalog_session.scalars(select(Metric)):
         for ref in (metric.numerator_key, metric.denominator_key, metric.weight_key):
             assert ref is None or ref in keys, (metric.key, ref)
-
-
-# The metric columns of a real Studio "Table data" export (the four descriptive columns are not metrics).
-STUDIO_METRIC_HEADERS = [
-    "Engaged views", "Watch time (hours)", "Subscribers", "Impressions", "Impressions click-through rate (%)",
-    "Stayed to watch (%)", "Unique viewers", "Average views per viewer", "New viewers", "Returning viewers",
-    "Subscribers gained", "Subscribers lost", "Likes", "Dislikes", "Likes (vs. dislikes) (%)", "Shares",
-    "Comments added", "Total sales (USD)", "Orders", "Approved commissions (USD)", "Pending commissions (USD)",
-    "Returned products (USD)", "YouTube Premium views", "YouTube Premium watch time (minutes)",
-    "Playlist watch time (hours)", "Views from playlist", "Views per playlist start", "Hours streamed",
-    "Reminders set", "Chat messages", "Reactions", "Post subscribers", "Remix count", "Remix views",
-    "Community clip views", "Watch time from community clips (hours)", "Card clicks", "Cards shown",
-    "Clicks per card shown (%)", "Card teaser clicks", "Card teasers shown",
-    "Teaser clicks per card teaser shown (%)", "End screen element clicks", "End screen elements shown",
-    "Clicks per end screen element shown (%)", "Views", "Average view duration", "Average percentage viewed (%)",
-]
 
 
 def test_every_column_of_a_real_export_is_recognised(catalog_session):
