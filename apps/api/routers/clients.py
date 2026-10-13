@@ -4,23 +4,20 @@ import uuid
 from datetime import date
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Response, UploadFile
+from fastapi import APIRouter, Form, HTTPException, Response, UploadFile
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
+import deps
 from config import settings
 from db.models import Client, Upload, Video, VideoMetric
-from db.session import get_session
 from ingest.importer import ImportRejected, Period, import_export
 from intake import spool_upload
 from schemas import ClientDeletedOut, ClientIn, ClientOut, ImportOut, PeriodIn, UploadOut
 
 router = APIRouter(prefix="/clients", tags=["clients"])
 
-# scope="function" makes get_session commit (or roll back) BEFORE the response is sent. With the default
-# scope the commit would run after the response, so a client could be told "deleted" and read the old
-# data straight back, and a failed commit would never reach the client at all.
-SessionDep = Annotated[Session, Depends(get_session, scope="function")]
+SessionDep = deps.SessionDep
 
 
 def _get_client(session: Session, client_id: uuid.UUID) -> Client:

@@ -9,8 +9,8 @@ import { MetricCard, EmptyState, PageHeader, Select, SkeletonCard, Skeleton } fr
 const ACCENT_COLORS = ['#ff3c3c','#ff6b6b','#fbbf24','#4ade80','#60a5fa','#c084fc','#f472b6']
 
 export default function Dashboard() {
-  const { get, post, upload, loading } = useApi()
-  const { client, clientId, scoped, version, dataChanged } = useClient()
+  const { get, upload, loading } = useApi()
+  const { client, clientId, scoped, version, dataChanged, refreshPublicData } = useClient()
   const [dataset,    setDataset]    = useState(null)
   const [duration,   setDuration]   = useState(null)
   const [durationMetric, setDurationMetric] = useState('Views')
@@ -57,8 +57,7 @@ export default function Dashboard() {
   const handleEnrich = async () => {
     toast.loading('Fetching YouTube details…', { id: 'enrich' })
     try {
-      const r = await post(`/clients/${clientId}/enrich`)
-      await dataChanged()
+      const r = await refreshPublicData(clientId)
       toast.success(
         r.requested === 0 ? 'Details are already up to date'
           : `Fetched ${r.stored} videos${r.unavailable ? `, ${r.unavailable} not public` : ''}`,

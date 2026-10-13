@@ -52,11 +52,43 @@ export default function Sidebar() {
         ))}
       </nav>
 
+      <QuotaMeter />
+
       {/* Footer */}
-      <div className="px-5 py-4 border-t text-xs" style={{ borderColor: 'var(--surface-border)', color: 'var(--text-muted)' }}>
+      <div className="px-5 py-3 border-t text-xs" style={{ borderColor: 'var(--surface-border)', color: 'var(--text-muted)' }}>
         v0.2.0 · FastAPI + React
       </div>
     </aside>
+  )
+}
+
+// ── YouTube quota ────────────────────────────────────────────────────────
+
+function untilReset(iso) {
+  const minutes = Math.max(0, Math.round((new Date(iso) - Date.now()) / 60000))
+  return minutes >= 60 ? `${Math.floor(minutes / 60)}h ${minutes % 60}m` : `${minutes}m`
+}
+
+function QuotaMeter() {
+  const { quota } = useClient()
+  if (!quota) return null
+  const left = quota.remaining / quota.limit
+  const color = left > 0.4 ? '#4ade80' : left > 0.1 ? '#fbbf24' : 'var(--brand)'
+  return (
+    <div className="px-4 py-3 border-t text-xs" style={{ borderColor: 'var(--surface-border)' }}
+      title={'Our own count of the API calls this app made, so an estimate: it cannot see other uses of the same key. '
+        + `Last 7 days: ${quota.used_last_7_days.toLocaleString()} units. The day resets at midnight Pacific time.`}>
+      <div className="flex justify-between mb-1" style={{ color: 'var(--text-muted)' }}>
+        <span>YouTube quota</span>
+        <span className="whitespace-nowrap">resets in {untilReset(quota.resets_at)}</span>
+      </div>
+      <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.08)' }}>
+        <div className="h-full rounded-full" style={{ width: `${left * 100}%`, background: color }} />
+      </div>
+      <div className="mt-1" style={{ color }}>
+        {quota.remaining.toLocaleString()} of {quota.limit.toLocaleString()} units left
+      </div>
+    </div>
   )
 }
 

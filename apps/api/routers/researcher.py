@@ -6,13 +6,14 @@ from googleapiclient.errors import HttpError
 
 import deps
 from schemas import IdeasOut, SearchIn, SearchOut
+from youtube import quota
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/researcher", tags=["researcher"])
 
 
 @router.post("/search", response_model=SearchOut)
-def researcher_search(body: SearchIn, api_key: deps.ApiKey) -> dict:
+def researcher_search(body: SearchIn, api_key: deps.ApiKey, session: deps.SessionDep) -> dict:
     """Search YouTube and return enriched videos plus a view-weighted tag analysis."""
     query = body.query.strip()
     if not query:
@@ -34,11 +35,15 @@ def researcher_search(body: SearchIn, api_key: deps.ApiKey) -> dict:
         status = getattr(exc.resp, "status", 502)
         logger.warning("YouTube API error %s: %s", status, exc.reason)
         if status == 403 and "quota" in str(exc.reason).lower():
+            quota.mark_exhausted(session)
+            session.commit()  # the error below would otherwise roll this back
             raise HTTPException(
                 status_code=429, detail="YouTube API quota exceeded. Try again after it resets."
             ) from None
         raise HTTPException(status_code=502, detail=f"YouTube API error: {exc.reason}") from None
 
+    # One search, plus one videos.list when it found anything.
+    quota.record(session, quota.COST_SEARCH_LIST + (quota.COST_VIDEOS_LIST if rows else 0))
     tags = deps.researcher_svc.analyze_tags(rows, top_n=body.top_n)
     return {"videos": rows, "tags": tags, "total": len(rows)}
 

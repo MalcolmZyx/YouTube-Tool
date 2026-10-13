@@ -1,5 +1,6 @@
 import { Routes, Route } from 'react-router-dom'
 import Sidebar from './components/Sidebar'
+import StatusAlerts from './components/StatusAlerts'
 import Dashboard    from './pages/Dashboard'
 import Heatmap      from './pages/Heatmap'
 import Keywords     from './pages/Keywords'
@@ -13,6 +14,7 @@ export default function App() {
       <Sidebar />
       <main className="flex-1 ml-56 overflow-auto">
         <div className="max-w-(--breakpoint-2xl) mx-auto px-8 py-8">
+          <StatusAlerts />
           <Routes>
             <Route path="/"             element={<Dashboard />}    />
             <Route path="/heatmap"      element={<Heatmap />}      />

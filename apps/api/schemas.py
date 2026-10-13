@@ -53,6 +53,29 @@ class EnrichOut(BaseModel):
     unavailable: int  # private, deleted or unknown on YouTube
 
 
+class QuotaOut(BaseModel):
+    limit: int
+    used_today: int
+    remaining: int
+    used_last_7_days: int
+    resets_at: datetime  # when the quota day rolls over (midnight Pacific time)
+    estimate: bool = True  # our own count: it cannot see calls made with the same key elsewhere
+
+
+class PublicDataAlertOut(BaseModel):
+    client_id: uuid.UUID
+    client_name: str
+    level: str  # "expired" (already hidden from the analyses) or "expiring" (within 7 days)
+    stored: int
+    expired: int
+    expiring_soon: int
+    next_expiry: datetime | None
+
+
+class PublicDataDeletedOut(BaseModel):
+    deleted_videos: int
+
+
 # ── analysis ────────────────────────────────────────────────────────────────
 
 

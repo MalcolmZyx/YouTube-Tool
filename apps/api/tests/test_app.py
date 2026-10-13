@@ -1,6 +1,7 @@
 """Route-level tests using FastAPI's TestClient."""
 import io
 import os
+from unittest.mock import MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
@@ -10,13 +11,17 @@ from openpyxl import Workbook
 
 import deps
 from app import app
+from db.session import get_session
 
 
 @pytest.fixture
 def client():
     deps.dataset_cache.clear()
+    # These tests do not use the database; a stand-in session keeps the routes that record quota from needing one.
+    app.dependency_overrides[get_session] = lambda: MagicMock()
     with TestClient(app) as c:
         yield c
+    app.dependency_overrides.clear()
     deps.dataset_cache.clear()
 
 

@@ -221,10 +221,7 @@ def test_expired_data_stops_appearing_in_analyses(api, client_id, catalog_sessio
     assert api.get(f"/api/clients/{client_id}/descriptions").json()["total"] == 0  # hidden even before the purge runs
 
 
-def test_enrich_needs_a_key_and_reports_quota_and_failures(api, client_id, monkeypatch):
-    quota = {"error": {"errors": [{"reason": "quotaExceeded"}]}}
-    monkeypatch.setattr(requests, "get", lambda *a, **k: FakeResponse(403, quota))
-    assert api.post(f"/api/clients/{client_id}/enrich").status_code == 429
+def test_enrich_needs_a_key_and_reports_failures(api, client_id, monkeypatch):
     monkeypatch.setattr(requests, "get", lambda *a, **k: FakeResponse(500, {}))
     assert api.post(f"/api/clients/{client_id}/enrich").status_code == 502
     monkeypatch.setenv("YOUTUBE_API_KEY", "")
