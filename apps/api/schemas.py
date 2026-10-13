@@ -76,6 +76,11 @@ class PublicDataDeletedOut(BaseModel):
     deleted_videos: int
 
 
+class PortalStatusOut(BaseModel):
+    configured: bool
+    published: dict[str, datetime]  # snapshot kind -> when it was last published
+
+
 class FindingOut(BaseModel):
     key: str
     title: str

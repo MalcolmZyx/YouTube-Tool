@@ -13,6 +13,7 @@ from config import settings
 from db.models import Client, Upload, Video, VideoMetric
 from ingest.importer import ImportRejected, Period, import_export
 from intake import spool_upload
+from portal import client as portal
 from schemas import ClientDeletedOut, ClientIn, ClientOut, ImportOut, PeriodIn, UploadOut
 
 router = APIRouter(prefix="/clients", tags=["clients"])
@@ -77,6 +78,14 @@ def get_client(client_id: uuid.UUID, session: SessionDep) -> ClientOut:
 def delete_client(client_id: uuid.UUID, session: SessionDep) -> ClientDeletedOut:
     """Erase a client and everything that belongs to it. Foreign-key cascades do the work."""
     client = _get_client(session, client_id)
+    # Take it off the portal first. If that fails, keep the client: erasing locally while its data stays online would
+    # leave the one copy we can no longer see or remove from this app.
+    if portal.is_configured():
+        try:
+            portal.unpublish(client_id)
+        except portal.PortalError as exc:
+            detail = f"Not deleted: {exc} Try again when the portal is reachable."
+            raise HTTPException(status_code=502, detail=detail) from None
     deleted = {
         "uploads": session.scalar(select(func.count()).select_from(Upload).where(Upload.client_id == client_id)),
         "videos": session.scalar(select(func.count()).select_from(Video).where(Video.client_id == client_id)),
