@@ -86,6 +86,9 @@ YouTube-Tool/
 | DELETE | `/api/clients/{id}/public-data`  | Erase a client's stored YouTube details (the export is kept) |
 | GET    | `/api/clients/{id}/audit`        | Audit findings (standouts, rhythm, Shorts vs long-form, click-through) |
 | GET    | `/api/clients/{id}/audit/report` | The audit as a self-contained HTML download |
+| GET    | `/api/clients/{id}/portal`       | Whether the portal is configured and when this client was last published |
+| POST   | `/api/clients/{id}/portal/publish` | Publish the audit and dashboard (export data only) to the portal |
+| DELETE | `/api/clients/{id}/portal/publish` | Remove the client from the portal |
 | GET    | `/api/quota`                     | YouTube quota used and left today (our own estimate) |
 | GET    | `/api/public-data/alerts`        | Clients whose stored YouTube data expired or expires within 7 days |
 

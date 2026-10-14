@@ -1,8 +1,9 @@
 import { NavLink } from 'react-router-dom'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import clsx from 'clsx'
 import toast from 'react-hot-toast'
 import { useClient } from '../hooks/useClient'
+import { useApi } from '../hooks/useApi'
 
 const NAV = [
   { to: '/',            icon: GridIcon,     label: 'Dashboard'   },
@@ -93,6 +94,53 @@ function QuotaMeter() {
   )
 }
 
+// ── Client portal: publish and unpublish ─────────────────────────────────
+
+function PortalPanel() {
+  const { get, post, del } = useApi()
+  const { clientId, version } = useClient()
+  const [state, setState] = useState(null)   // { configured, published }
+  const [busy,  setBusy]  = useState(false)
+
+  useEffect(() => {
+    setState(null)
+    get(`/clients/${clientId}/portal`).then(setState).catch(() => setState({ configured: true, published: {}, unreachable: true }))
+  }, [clientId, version])  // eslint-disable-line
+
+  const act = async (fn, okMessage) => {
+    setBusy(true)
+    try {
+      setState(await fn())
+      toast.success(okMessage)
+    } catch (err) { toast.error(err.message) } finally { setBusy(false) }
+  }
+
+  const publish = () => act(() => post(`/clients/${clientId}/portal/publish`), 'Published to the portal')
+  const unpublish = () => {
+    if (!window.confirm('Remove this client from the portal? Their published results, and any requests they made there, are deleted from the portal.')) return
+    act(() => del(`/clients/${clientId}/portal/publish`), 'Removed from the portal')
+  }
+
+  if (!state) return null
+  if (!state.configured) {
+    return <div className="text-xs" style={{ color: 'var(--text-muted)' }}>Portal: not configured (see .env.example)</div>
+  }
+  const when = Object.values(state.published ?? {})[0]
+  return (
+    <div className="space-y-1 pt-1 border-t" style={{ borderColor: 'var(--surface-border)' }}>
+      <div className="text-xs" style={{ color: state.unreachable ? '#fbbf24' : 'var(--text-muted)' }}>
+        {state.unreachable ? 'Portal unreachable' : when ? `Portal: published ${new Date(when).toLocaleDateString()}` : 'Portal: not published'}
+      </div>
+      <div className="flex gap-1">
+        <button className="btn btn-ghost flex-1" disabled={busy || state.unreachable} onClick={publish}>
+          {when ? 'Republish' : 'Publish'}
+        </button>
+        {when && <button className="btn btn-ghost" disabled={busy} onClick={unpublish}>Unpublish</button>}
+      </div>
+    </div>
+  )
+}
+
 // ── Client switcher ──────────────────────────────────────────────────────
 
 function ClientSwitcher() {
@@ -146,6 +194,7 @@ function ClientSwitcher() {
           {client.video_count} videos · {client.upload_count} uploads
         </div>
       )}
+      {client && client.upload_count > 0 && <PortalPanel />}
     </div>
   )
 }
