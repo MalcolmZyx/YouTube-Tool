@@ -31,6 +31,7 @@ YouTube-Tool/
 │   │   │   │                            DurationService, DescriptionService
 │   │   │   └── researcher_service.py ← ResearcherService (search, autocomplete, tag analysis)
 │   │   └── tests/                    ← pytest suite
+│   ├── portal/                       ← client portal (sign in, see the published dashboard and audit)
 │   └── web/
 │       ├── index.html
 │       ├── package.json
@@ -146,7 +147,25 @@ python app.py
 # → Runs on http://localhost:5000, API docs at http://localhost:5000/docs
 ```
 
-### 3. Frontend
+### 3. Client portal (optional)
+
+The portal is a separate app that clients sign in to. It reads only what you publish, from a local Supabase stack:
+
+```bash
+npm install                                  # from the repository root: installs the Supabase CLI
+npx supabase start                           # Docker must be running; first start downloads images
+npx supabase status -o env                   # shows API_URL, ANON_KEY and SERVICE_ROLE_KEY
+
+# apps/api/.env: PORTAL_URL=<API_URL>  PORTAL_SERVICE_KEY=<SERVICE_ROLE_KEY>   (enables Publish in the admin app)
+# apps/portal/.env.local: VITE_SUPABASE_URL=<API_URL>  VITE_SUPABASE_ANON_KEY=<ANON_KEY>
+cd apps/portal && npm install && npm run dev  # http://localhost:5174
+```
+
+Accounts are invitation-only: create a user in Supabase Studio (http://127.0.0.1:54323, Authentication) and add a row to
+`portal_membership` linking the user to a client. How it is secured and tested:
+[docs/concepts/portal-security.md](docs/concepts/portal-security.md).
+
+### 4. Frontend
 
 ```bash
 cd apps/web

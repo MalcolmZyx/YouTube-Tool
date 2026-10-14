@@ -86,3 +86,14 @@ holds nothing. Only the *admin API's* publish path uses the service key.
 5. Why revoke the default privileges as well as writing policies?
 6. Why turn off public sign-up for an invite-only portal?
 7. Which attacks do the tests attempt, and why is a test that tries to break the policy better than reading the policy?
+
+## The portal app (browser-level check)
+
+`apps/portal` holds only the public anon key and the user's own session; it has no route to the admin app and no secret.
+Driving it in a real browser (headless Chrome) verified: a visitor sees only the sign-in form; a wrong password gives one
+generic message (the same for an unknown address, so it does not reveal which accounts exist); after signing in the user
+sees their client's 60 videos and totals and never the other client's name; the audit page shows every finding with its
+caveats; nothing resembling the service key is in the browser's storage; sign-out returns to the form; no script errors.
+Video titles come from creators' files, so they are only ever rendered as React text (escaped), never as HTML.
+
+For deployment (not done yet): a Content-Security-Policy, HTTPS only, and a rate limit on sign-in attempts.

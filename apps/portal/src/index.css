@@ -1,0 +1,229 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-display: Syne, sans-serif;
+  --font-body: DM Sans, sans-serif;
+  --font-mono: DM Mono, monospace;
+
+  --color-brand-50: #fff1f1;
+  --color-brand-100: #ffe1e1;
+  --color-brand-200: #ffc7c7;
+  --color-brand-300: #ffa0a0;
+  --color-brand-400: #ff6b6b;
+  --color-brand-500: #ff3c3c;
+  --color-brand-600: #ed1515;
+  --color-brand-700: #c80d0d;
+  --color-brand-800: #a50f0f;
+  --color-brand-900: #881414;
+  --color-brand-950: #4b0404;
+
+  --color-surface-50: #f6f6f7;
+  --color-surface-100: #ededef;
+  --color-surface-200: #d7d7dc;
+  --color-surface-300: #b5b5bd;
+  --color-surface-400: #8d8d99;
+  --color-surface-500: #6f6f7d;
+  --color-surface-600: #5a5a67;
+  --color-surface-700: #4a4a55;
+  --color-surface-800: #3f3f48;
+  --color-surface-900: #383840;
+  --color-surface-950: #111114;
+
+  --animate-fade-in: fadeIn 0.4s ease forwards;
+  --animate-slide-up: slideUp 0.35s ease forwards;
+  --animate-shimmer: shimmer 1.6s infinite linear;
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes shimmer {
+    0% {
+      background-position: -1000px 0;
+    }
+    100% {
+      background-position: 1000px 0;
+    }
+  }
+}
+
+/*
+  The default border color has changed to `currentcolor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentcolor);
+  }
+}
+
+:root {
+  --brand: #ff3c3c;
+  --brand-dim: rgba(255,60,60,0.12);
+  --surface-bg: #111114;
+  --surface-card: #1a1a1f;
+  --surface-border: rgba(255,255,255,0.07);
+  --text-primary: #f0f0f2;
+  --text-muted: #8d8d99;
+  --accent-green: #4ade80;
+  --accent-blue: #60a5fa;
+  --accent-amber: #fbbf24;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  background-color: var(--surface-bg);
+  color: var(--text-primary);
+  font-family: 'DM Sans', sans-serif;
+  margin: 0;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Scrollbar ───────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.22); }
+
+/* ── Card base ───────────────────────────────────────────────────── */
+.card {
+  background: var(--surface-card);
+  border: 1px solid var(--surface-border);
+  border-radius: 12px;
+  padding: 1.5rem;
+}
+
+/* ── Tag pill ────────────────────────────────────────────────────── */
+.tag-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 99px;
+  font-size: 0.75rem;
+  font-family: 'DM Mono', monospace;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: var(--text-muted);
+  cursor: default;
+  transition: all 0.15s ease;
+}
+.tag-pill:hover {
+  background: var(--brand-dim);
+  border-color: var(--brand);
+  color: var(--brand);
+}
+
+/* ── Input ───────────────────────────────────────────────────────── */
+.input {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.875rem;
+  padding: 0.5rem 0.875rem;
+  outline: none;
+  transition: border-color 0.15s ease;
+  width: 100%;
+}
+.input:focus { border-color: var(--brand); }
+.input::placeholder { color: var(--text-muted); }
+
+/* ── Button ─────────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0.5rem 1.25rem;
+  border-radius: 8px;
+  font-family: 'Syne', sans-serif;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+.btn-primary {
+  background: var(--brand);
+  color: white;
+}
+.btn-primary:hover { background: #ed1515; transform: translateY(-1px); }
+.btn-primary:active { transform: translateY(0); }
+.btn-ghost {
+  background: rgba(255,255,255,0.05);
+  color: var(--text-muted);
+  border: 1px solid var(--surface-border);
+}
+.btn-ghost:hover { background: rgba(255,255,255,0.09); color: var(--text-primary); }
+
+/* ── Loading skeleton ───────────────────────────────────────────── */
+.skeleton {
+  background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 75%);
+  background-size: 1000px 100%;
+  animation: shimmer 1.6s infinite linear;
+  border-radius: 6px;
+}
+
+/* ── Table base ─────────────────────────────────────────────────── */
+.data-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.8rem;
+}
+.data-table th {
+  background: rgba(255,255,255,0.03);
+  border-bottom: 1px solid var(--surface-border);
+  color: var(--text-muted);
+  font-family: 'Syne', sans-serif;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  padding: 10px 14px;
+  text-align: left;
+  text-transform: uppercase;
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  cursor: pointer;
+  user-select: none;
+}
+.data-table th:hover { color: var(--text-primary); }
+.data-table th.sorted { color: var(--brand); }
+.data-table td {
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  padding: 10px 14px;
+  vertical-align: middle;
+}
+.data-table tr:hover td { background: rgba(255,255,255,0.025); }
+.data-table tr.total-row td {
+  background: rgba(255,60,60,0.06);
+  border-bottom: 1px solid rgba(255,60,60,0.2);
+  font-weight: 600;
+}
