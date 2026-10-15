@@ -41,6 +41,7 @@ register_error_handlers(app)
 
 for module in (system, dashboard, analysis, researcher, clients, client_data, youtube_status, portal):
     app.include_router(module.router, prefix="/api")
+app.include_router(portal.requests_router, prefix="/api")
 
 
 if __name__ == "__main__":

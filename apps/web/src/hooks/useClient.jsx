@@ -16,6 +16,7 @@ export function ClientProvider({ children }) {
   // Bumped after an upload so pages reload the client's data.
   const [version, setVersion] = useState(0)
   const [quota,  setQuota]  = useState(null)   // YouTube API quota left today (our own estimate)
+  const [openRequests, setOpenRequests] = useState(0)   // client requests waiting for a decision
   const [alerts, setAlerts] = useState([])     // clients whose stored YouTube data expired or is about to
 
   const loadStatus = useCallback(async () => {
@@ -24,6 +25,10 @@ export function ClientProvider({ children }) {
       setQuota(q)
       setAlerts(a)
     } catch { /* the banner and the meter simply stay as they were */ }
+    // 503 when no portal is configured: then there is simply nothing waiting.
+    get('/portal/requests', { open_only: true })
+      .then(rows => setOpenRequests(rows.filter(r => r.status === 'requested').length))
+      .catch(() => setOpenRequests(0))
   }, [get])
 
   const refresh = useCallback(async () => {
@@ -74,13 +79,13 @@ export function ClientProvider({ children }) {
   }
 
   const value = useMemo(() => ({
-    clients, clientId, ready, version, quota, alerts, loadStatus, refreshPublicData, deletePublicData,
+    clients, clientId, ready, version, quota, alerts, openRequests, loadStatus, refreshPublicData, deletePublicData,
     client: clients.find(c => c.id === clientId) ?? null,
     // Turns '/heatmap' into '/clients/<id>/heatmap' for the selected client.
     scoped: path => `/clients/${clientId}${path}`,
     select, create, remove, refresh,
     dataChanged: () => { setVersion(v => v + 1); loadStatus(); return refresh() },
-  }), [clients, clientId, ready, version, quota, alerts])  // eslint-disable-line
+  }), [clients, clientId, ready, version, quota, alerts, openRequests])  // eslint-disable-line
 
   return <ClientContext.Provider value={value}>{children}</ClientContext.Provider>
 }

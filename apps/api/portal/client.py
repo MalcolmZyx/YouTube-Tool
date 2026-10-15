@@ -97,3 +97,55 @@ def status(client_id) -> dict[str, str]:
     response = _request("GET", "published_snapshot",
                         params={"client_id": f"eq.{client_id}", "select": "kind,published_at,as_of"})
     return {row["kind"]: row["published_at"] for row in response.json()}
+
+
+# ── what clients create in the portal: requests, permissions, preferences ───────────────────────────────────────────
+# Request notes are written by clients, so they are untrusted text: stored and shown as text, never interpreted.
+
+REQUEST_STATUSES = ("requested", "approved", "declined", "done")
+PERMISSION_STATUSES = ("requested", "granted", "denied", "expired")
+
+
+def list_requests(statuses: tuple[str, ...] | None = None) -> list[dict]:
+    """Requests from every client, newest first. `statuses` filters (default: all)."""
+    params = {
+        "select": "id,client_id,type,note,status,created_at,updated_at", "order": "created_at.desc", "limit": "500",
+    }
+    if statuses:
+        params["status"] = f"in.({','.join(statuses)})"
+    return _request("GET", "service_request", params=params).json()
+
+
+def set_request_status(request_id: int, new_status: str) -> dict | None:
+    """Change a request's status. Returns the updated row, or None if no such request."""
+    response = _request(
+        "PATCH", "service_request", params={"id": f"eq.{request_id}"}, prefer="return=representation",
+        body={"status": new_status, "updated_at": datetime.now().astimezone().isoformat()},
+    )
+    rows = response.json()
+    return rows[0] if rows else None
+
+
+def list_permissions(client_id) -> list[dict]:
+    response = _request("GET", "client_permission", params={
+        "client_id": f"eq.{client_id}", "select": "feature,status,quota,expires_at", "order": "feature"})
+    return response.json()
+
+
+def set_permission(client_id, feature: str, new_status: str, quota: int | None, expires_at: datetime | None) -> None:
+    """Create or replace one permission for a client."""
+    _request("POST", "client_permission", params={"on_conflict": "client_id,feature"},
+             prefer="resolution=merge-duplicates,return=minimal", body={
+                 "client_id": str(client_id), "feature": feature, "status": new_status, "quota": quota,
+                 "expires_at": expires_at.isoformat() if expires_at else None})
+
+
+def delete_permission(client_id, feature: str) -> None:
+    _request("DELETE", "client_permission", params={"client_id": f"eq.{client_id}", "feature": f"eq.{feature}"})
+
+
+def get_preference(client_id) -> dict:
+    """What the client chose to focus on (empty if they have not chosen)."""
+    rows = _request("GET", "dashboard_preference",
+                    params={"client_id": f"eq.{client_id}", "select": "focus,updated_at"}).json()
+    return rows[0] if rows else {"focus": {}, "updated_at": None}

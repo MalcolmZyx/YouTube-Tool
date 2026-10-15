@@ -70,6 +70,30 @@ nothing; writing or editing a snapshot is refused (403); a request for themselve
 client refused; a visitor with no login is refused (401); public sign-up is refused; and after unpublishing the portal
 holds nothing. Only the *admin API's* publish path uses the service key.
 
+## Requests, access and focus
+
+Who may change what, and why it is built this way:
+
+| Thing | Client | Admin app (service key) |
+|---|---|---|
+| Request (`service_request`) | create for itself, read its own | read all, set the status |
+| Access (`client_permission`) | read its own | grant, deny, set a quota and an expiry, remove |
+| Focus (`dashboard_preference`) | read, create, change its own | read |
+
+* **A client can never decide its own request or grant itself access**: there is no update privilege on those columns at
+  all (a request's `status` is not even insertable), so the database refuses it, whatever the portal code does.
+* **The admin app reaches out.** Nothing is pushed into your machine: the Requests page reads the portal on demand, and a
+  badge in the sidebar counts requests still waiting. Acting on one writes its new status back, which the client sees.
+* **Notes are untrusted text.** A client's note is stored and shown as plain text in both apps (React escapes it). The
+  test submits `<b onmouseover=alert(1)>` and checks nothing was injected. Notes are capped at 1,000 characters by the
+  database and the focus choices at 8 KB.
+* **Focus is stored, not yet acted on.** It tells you what the client cares about; letting it steer the audit is later work.
+* The admin routes validate before anything is sent: only the four statuses, a `[a-z0-9_]` feature name, a non-negative quota.
+
+Checked end to end with real logins in a browser: the client asked, the admin approved and granted access with a quota, the
+client saw both; client B saw none of A's requests or choices; A could not change a status, grant itself access or write B's
+preferences (403); an oversized note was refused.
+
 ## What this does not cover (yet)
 
 * The service key is the master key: its safety is operational (never in the browser, never committed).

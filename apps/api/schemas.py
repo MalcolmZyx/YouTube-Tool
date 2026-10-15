@@ -81,6 +81,39 @@ class PortalStatusOut(BaseModel):
     published: dict[str, datetime]  # snapshot kind -> when it was last published
 
 
+class PortalRequestOut(BaseModel):
+    id: int
+    client_id: uuid.UUID
+    client_name: str | None  # None if the client no longer exists here
+    type: str
+    note: str
+    status: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class RequestStatusIn(BaseModel):
+    status: Literal["requested", "approved", "declined", "done"]
+
+
+class PermissionIn(BaseModel):
+    status: Literal["requested", "granted", "denied", "expired"]
+    quota: int | None = Field(default=None, ge=0, le=1_000_000)
+    expires_in_days: int | None = Field(default=None, ge=1, le=3650)
+
+
+class PermissionOut(BaseModel):
+    feature: str
+    status: str
+    quota: int | None
+    expires_at: datetime | None
+
+
+class PreferenceOut(BaseModel):
+    focus: dict[str, Any]
+    updated_at: datetime | None
+
+
 class FindingOut(BaseModel):
     key: str
     title: str
