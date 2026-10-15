@@ -1,6 +1,6 @@
 """Public YouTube data maintenance. Run from apps/api:
 
-    python -m youtube purge                 delete public data older than 30 days (run daily)
+    python -m youtube purge                 delete expired public data now (MongoDB also does it by itself)
     python -m youtube refresh <client_id>   fetch or renew public data for one client (needs YOUTUBE_API_KEY)
 """
 import argparse
@@ -12,8 +12,8 @@ from sqlalchemy.orm import Session
 
 from config import get_api_key
 from db.session import get_engine
+from youtube import store
 from youtube.client import YouTubeError
-from youtube.store import purge_expired, refresh_client
 
 
 def main(argv: Sequence[str] | None = None, engine: Engine | None = None) -> int:
@@ -25,17 +25,21 @@ def main(argv: Sequence[str] | None = None, engine: Engine | None = None) -> int
     refresh.add_argument("--force", action="store_true", help="refetch even data that is still fresh")
     args = parser.parse_args(argv)
 
+    if args.command == "purge":
+        try:
+            print(f"Purged {store.purge_expired()} expired documents.")
+        except store.StoreError as exc:
+            print(f"Stopped: {exc}")
+            return 1
+        return 0
     with Session(engine or get_engine()) as session, session.begin():
-        if args.command == "purge":
-            print(f"Purged public data for {purge_expired(session)} videos.")
-            return 0
         key = get_api_key()
         if not key:
             print("YOUTUBE_API_KEY is not set.")
             return 1
         try:
-            result = refresh_client(session, args.client_id, key, force=args.force)
-        except YouTubeError as exc:
+            result = store.refresh_client(session, args.client_id, key, force=args.force)
+        except (YouTubeError, store.StoreError) as exc:
             print(f"Stopped: {exc}")
             return 1
         print(f"{result.requested} needed data: {result.stored} stored, {result.unavailable} unavailable.")

@@ -13,7 +13,20 @@ jobs:
     env:
       # Database tests must run in CI; a missing database should fail the build, not skip them.
       REQUIRE_DB: "1"
+      REQUIRE_MONGO: "1"
     services:
+      mongo:
+        image: mongo:8
+        env:
+          MONGO_INITDB_ROOT_USERNAME: ytstudio
+          MONGO_INITDB_ROOT_PASSWORD: ytstudio_dev
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval \"db.adminCommand('ping').ok\""
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
       postgres:
         image: postgres:17
         env:

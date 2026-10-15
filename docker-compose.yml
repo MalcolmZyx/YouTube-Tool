@@ -1,4 +1,4 @@
-# Local development services. Start with:  docker compose up -d
+# Local development services (Postgres, MongoDB). Start with:  docker compose up -d
 #
 # The credentials below are development-only defaults. The port is bound to 127.0.0.1, so the
 # database is reachable from this machine only. Override with POSTGRES_PASSWORD in a root .env file.
@@ -21,5 +21,25 @@ services:
       timeout: 3s
       retries: 10
 
+  # Public YouTube API data lives here, not in Postgres: it is raw JSON and each document must be deleted by the
+  # database itself 30 days after it was fetched (a TTL index). See docs/concepts/youtube-api.md.
+  mongo:
+    image: mongo:8
+    container_name: yt-studio-mongo
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ytstudio
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:-ytstudio_dev}
+    ports:
+      - "127.0.0.1:27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
 volumes:
   postgres_data:
+  mongo_data:

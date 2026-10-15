@@ -12,10 +12,8 @@ from routers.analysis import make_router
 from routers.clients import SessionDep, _get_client
 from schemas import AuditOut, DatasetOut, EnrichOut, PublicDataDeletedOut
 from services.client_data import NoUpload, load_table, pick_upload
-from youtube import quota
+from youtube import quota, store
 from youtube.client import BATCH_SIZE, QuotaExceeded, YouTubeError
-from youtube.status import delete_public_data
-from youtube.store import load_public_data, refresh_client, videos_due
 
 
 def get_client_dataset(client_id: uuid.UUID, session: SessionDep, upload_id: int | None = None) -> dict[str, Any]:
@@ -27,8 +25,17 @@ def get_client_dataset(client_id: uuid.UUID, session: SessionDep, upload_id: int
         raise HTTPException(status_code=404, detail=str(exc)) from None
     frame, total_row = load_table(session, upload)
     dataset = deps.data_svc.build_dataset(frame, total_row)
-    _attach_public_data(dataset, load_public_data(session, client_id))
+    _attach_public_data(dataset, _public_data(client_id))
     return dataset
+
+
+def _public_data(client_id: uuid.UUID) -> dict[str, dict]:
+    """The stored YouTube details, or none: they only enrich Keywords and Descriptions, so a store that is not set
+    up (or is down) must not break the dashboard."""
+    try:
+        return store.load_public_data(client_id)
+    except store.StoreError:
+        return {}
 
 
 def _attach_public_data(dataset: dict[str, Any], public: dict[str, dict]) -> None:
@@ -62,14 +69,22 @@ def enrich_client(client_id: uuid.UUID, session: SessionDep, api_key: deps.ApiKe
     expires after 30 days (YouTube's rule for public data); see youtube/store.py.
     """
     _get_client(session, client_id)
-    needed = -(-len(videos_due(session, client_id, force)) // BATCH_SIZE) * quota.COST_VIDEOS_LIST  # ceil division
+    try:
+        due = store.videos_due(session, client_id, force)
+    except store.StoreNotConfigured as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from None
+    except store.StoreError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from None
+    needed = -(-len(due) // BATCH_SIZE) * quota.COST_VIDEOS_LIST  # ceil division
     left = quota.get_status(session).remaining
     if needed > left:
         raise HTTPException(
             status_code=429, detail=f"Not enough YouTube quota left today (needs about {needed} units, {left} left)."
         )
     try:
-        result = refresh_client(session, client_id, api_key, force=force)
+        result = store.refresh_client(session, client_id, api_key, force=force)
+    except store.StoreError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from None
     except QuotaExceeded as exc:
         quota.mark_exhausted(session)
         session.commit()  # the error below would otherwise roll this back
@@ -84,7 +99,12 @@ def enrich_client(client_id: uuid.UUID, session: SessionDep, api_key: deps.ApiKe
 def delete_client_public_data(client_id: uuid.UUID, session: SessionDep) -> PublicDataDeletedOut:
     """Erase the stored YouTube details (tags, descriptions, thumbnails) for this client. The export is kept."""
     _get_client(session, client_id)
-    return PublicDataDeletedOut(deleted_videos=delete_public_data(session, client_id))
+    try:
+        return PublicDataDeletedOut(deleted_videos=store.delete_client_data(client_id))
+    except store.StoreNotConfigured:
+        return PublicDataDeletedOut(deleted_videos=0)  # nothing is stored without a store
+    except store.StoreError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from None
 
 
 @router.get("/audit", response_model=AuditOut, tags=["audit"])

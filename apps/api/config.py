@@ -41,6 +41,10 @@ class Settings(BaseSettings):
     youtube_daily_quota: int = 10_000
     # Base URL of the portal's Supabase API (local default: http://127.0.0.1:54321). Empty means no portal.
     portal_url: str = ""
+    # MongoDB holds the raw public YouTube API data (30-day TTL). Empty means not configured: the YouTube
+    # features report that instead of failing. Local default: mongodb://ytstudio:ytstudio_dev@127.0.0.1:27017/?authSource=admin
+    mongo_url: str = ""
+    mongo_db: str = "ytstudio"
     # SQLAlchemy URL for Postgres. The default matches docker-compose.yml (development only).
     database_url: str = "postgresql+psycopg://ytstudio:ytstudio_dev@127.0.0.1:5432/ytstudio"
 

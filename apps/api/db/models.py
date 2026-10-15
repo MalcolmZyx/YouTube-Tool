@@ -31,7 +31,6 @@ from sqlalchemy import (
     UniqueConstraint,
     Uuid,
     func,
-    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -131,58 +130,6 @@ class Video(Base):
         UniqueConstraint("client_id", "id", name="client_id_id"),
         CheckConstraint("youtube_video_id ~ '^[A-Za-z0-9_-]{11}$'", name="youtube_id_format"),
         CheckConstraint("duration_seconds IS NULL OR duration_seconds >= 0", name="duration_nonnegative"),
-    )
-
-
-class VideoPublicMetadata(Base):
-    """Fields fetched from the public YouTube API. Must be refreshed or deleted within 30 days."""
-
-    __tablename__ = "video_public_metadata"
-
-    video_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-    client_id: Mapped[uuid.UUID] = mapped_column(Uuid)
-    description: Mapped[str | None] = mapped_column(Text)
-    thumbnail_url: Mapped[str | None] = mapped_column(Text)
-    category_id: Mapped[str | None] = mapped_column(Text)
-    # The export has no 'private' notion; the API simply returns nothing for a private or removed video.
-    availability: Mapped[str] = mapped_column(Text)
-    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    expires_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=text("now() + interval '30 days'")
-    )
-
-    __table_args__ = (
-        ForeignKeyConstraint(
-            ["client_id", "video_id"], ["video.client_id", "video.id"],
-            ondelete="CASCADE",
-            name="fk_video_public_metadata_video",
-        ),
-        CheckConstraint(_in("availability", AVAILABILITIES), name="availability_known"),
-        CheckConstraint("expires_at > fetched_at", name="expiry_after_fetch"),
-        # The cleanup job scans by expiry.
-        Index("ix_video_public_metadata_expires_at", "expires_at"),
-    )
-
-
-class VideoTag(Base):
-    """One tag on one video. API-sourced, so it expires together with the video's public metadata."""
-
-    __tablename__ = "video_tag"
-
-    video_id: Mapped[int] = mapped_column(BigInteger)
-    tag: Mapped[str] = mapped_column(Text)
-    client_id: Mapped[uuid.UUID] = mapped_column(Uuid)
-
-    __table_args__ = (
-        PrimaryKeyConstraint("video_id", "tag", name="pk_video_tag"),
-        ForeignKeyConstraint(
-            ["client_id", "video_id"], ["video.client_id", "video.id"],
-            ondelete="CASCADE",
-            name="fk_video_tag_video",
-        ),
-        # Tags are stored normalised so "Star Wars" and "star wars " are one tag.
-        CheckConstraint("tag = lower(btrim(tag)) AND length(tag) > 0", name="tag_normalised"),
     )
 
 

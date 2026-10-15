@@ -33,6 +33,7 @@ class VideoInfo:
     category_id: str | None = None
     thumbnail_url: str | None = None
     published_at: datetime | None = None
+    snippet: dict = field(default_factory=dict, repr=False)  # exactly what the API returned, for the raw store
 
 
 def batches(ids: Iterable[str], size: int = BATCH_SIZE) -> Iterator[list[str]]:
@@ -53,6 +54,17 @@ def _thumbnail(thumbnails: dict) -> str | None:
     return None
 
 
+def describe(snippet: dict) -> dict:
+    """The fields the app uses, derived from a raw API snippet. Tags are lower-cased and de-duplicated."""
+    tags = sorted({t.strip().lower() for t in snippet.get("tags", []) if t and t.strip()})
+    return {
+        "description": snippet.get("description", ""),
+        "tags": tags,
+        "category_id": snippet.get("categoryId"),
+        "thumbnail_url": _thumbnail(snippet.get("thumbnails", {})) or "",
+    }
+
+
 def _parse(item: dict) -> VideoInfo:
     snippet = item.get("snippet", {})
     published = snippet.get("publishedAt")
@@ -63,6 +75,7 @@ def _parse(item: dict) -> VideoInfo:
         category_id=snippet.get("categoryId"),
         thumbnail_url=_thumbnail(snippet.get("thumbnails", {})),
         published_at=datetime.fromisoformat(published.replace("Z", "+00:00")) if published else None,
+        snippet=snippet,
     )
 
 

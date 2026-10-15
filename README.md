@@ -18,7 +18,7 @@ YouTube-Tool/
 │   │   ├── intake.py                 ← safe upload handling (size cap, hashing)
 │   │   ├── security.py               ← Origin/Host guards, upload limits, log redaction
 │   │   ├── audit/                    ← the audit engine: findings with evidence and caveats
-│   │   ├── youtube/                  ← batched YouTube client, 30-day store, quota count, expiry alerts
+│   │   ├── youtube/                  ← batched YouTube client, MongoDB store (30-day TTL), quota count, expiry alerts
 │   │   ├── synthetic/                ← seeded fake channels in Studio export format
 │   │   ├── db/                       ← SQLAlchemy models, metric catalog + seed data, session
 │   │   ├── migrations/               ← Alembic migrations (schema history)
@@ -98,7 +98,7 @@ YouTube-Tool/
 | GET    | `/api/portal/inbox`              | Files clients uploaded to the portal, waiting to be pulled |
 | POST   | `/api/portal/inbox/pull`         | Import every waiting upload (normal importer) and tell each client the outcome |
 | GET    | `/api/quota`                     | YouTube quota used and left today (our own estimate) |
-| GET    | `/api/public-data/alerts`        | Clients whose stored YouTube data expired or expires within 7 days |
+| GET    | `/api/public-data/alerts`        | Clients whose stored YouTube data expires within 7 days |
 
 Per-client analysis reads the stored export from Postgres. Each of these also exists under
 `/api/clients/{id}/...` (`dashboard`, `heatmap`, `duration`, `keywords/weighted`, `keywords/top-vs-bottom`,
@@ -112,9 +112,9 @@ and will be removed. Keywords and descriptions are empty until YouTube API data 
 
 The app is two processes: the FastAPI server (port 5000) and the Vite dev server for the UI (port 5173). Run both, each in its own terminal. The API has no page of its own, so opening `/` on port 5000 shows a 404; open http://localhost:5000/docs for the interactive API documentation instead.
 
-### 1. Database
+### 1. Databases
 
-Postgres runs in Docker (start Docker Desktop first):
+Postgres (the creator's exported data) and MongoDB (public YouTube data, deleted automatically after 30 days) run in Docker (start Docker Desktop first):
 
 ```bash
 docker compose up -d                 # from the repository root
@@ -122,10 +122,10 @@ cd apps/api
 alembic upgrade head                 # create the tables
 python -m db sync-catalog            # load the metric catalog
 python -m synthetic seed             # optional: three fake channels to explore
-python -m youtube purge              # delete YouTube data older than 30 days (run daily)
 ```
 
-The `/api/clients` routes use it (create a client, upload exports, erase it). How the database is designed and
+For the YouTube features (tags, descriptions) set `MONGO_URL=mongodb://ytstudio:ytstudio_dev@127.0.0.1:27017/?authSource=admin` in
+`apps/api/.env`. The `/api/clients` routes use Postgres (create a client, upload exports, erase it). How the database is designed and
 why: [docs/concepts/data-model.md](docs/concepts/data-model.md); how exports are imported:
 [docs/concepts/importing.md](docs/concepts/importing.md); fake demo data:
 [docs/concepts/synthetic-data.md](docs/concepts/synthetic-data.md); the YouTube API and its 30-day rule:
