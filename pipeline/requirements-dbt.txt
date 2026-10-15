@@ -1,0 +1,7 @@
+# dbt lives in its own virtual environment, separate from the API's: it pins many of its own dependencies and the two
+# would fight. Create it with:
+#     python -m venv .dbt-venv
+#     .dbt-venv/Scripts/activate        (Windows)   or   source .dbt-venv/bin/activate
+#     pip install -r pipeline/requirements-dbt.txt
+dbt-core==1.11.16
+dbt-postgres==1.11.0

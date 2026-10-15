@@ -54,6 +54,7 @@ YouTube-Tool/
 │               ├── Researcher.jsx    ← Search, autocomplete ideas, competitor tags
 │               └── Settings.jsx      ← API key management + system status
 ├── supabase/                         ← client portal database: config and migrations (local Supabase)
+├── pipeline/                         ← the analytics layer: dbt models, tests, docs, and a cross-check against the audit
 ├── docs/concepts/                    ← design notes (start with data-model.md)
 ├── docker-compose.yml                ← local Postgres
 ├── .github/workflows/ci.yml          ← lint, tests (with Postgres), audits, frontend build
@@ -130,7 +131,8 @@ why: [docs/concepts/data-model.md](docs/concepts/data-model.md); how exports are
 [docs/concepts/synthetic-data.md](docs/concepts/synthetic-data.md); the YouTube API and its 30-day rule:
 [docs/concepts/youtube-api.md](docs/concepts/youtube-api.md); the audit and its statistics:
 [docs/concepts/audit.md](docs/concepts/audit.md); portal security and how it is tested:
-[docs/concepts/portal-security.md](docs/concepts/portal-security.md).
+[docs/concepts/portal-security.md](docs/concepts/portal-security.md); the dbt analytics layer:
+[docs/concepts/dbt.md](docs/concepts/dbt.md).
 
 ### 2. Backend
 
@@ -151,6 +153,16 @@ cp .env.example .env
 # Run the API (add DEBUG=true to .env for auto-reload while developing)
 python app.py
 # → Runs on http://localhost:5000, API docs at http://localhost:5000/docs
+```
+
+### 2b. Analytics marts (optional, dbt)
+
+SQL models over the database (per-video table, cadence, format summary, client overview) with 40 tests and a docs site.
+dbt has its own environment; see [docs/concepts/dbt.md](docs/concepts/dbt.md):
+
+```bash
+python -m venv .dbt-venv && .dbt-venv/Scripts/activate && pip install -r pipeline/requirements-dbt.txt
+cd pipeline/dbt && dbt build --profiles-dir .
 ```
 
 ### 3. Client portal (optional)

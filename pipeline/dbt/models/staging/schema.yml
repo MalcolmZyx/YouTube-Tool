@@ -1,0 +1,78 @@
+version: 2
+
+models:
+  - name: stg_client
+    description: One row per client. Renamed columns, no logic beyond marking synthetic demo channels.
+    columns:
+      - name: client_id
+        tests: [unique, not_null]
+      - name: client_name
+        tests: [not_null]
+      - name: is_synthetic
+        description: True for the fake demo channels created by `python -m synthetic seed`.
+
+  - name: stg_upload
+    description: >
+      One row per imported export, with the reference date video ages are measured against (`as_of_date`) and a flag for
+      each client's newest upload. The date rule matches the Python audit so the two never disagree.
+    columns:
+      - name: upload_id
+        tests: [unique, not_null]
+      - name: client_id
+        tests:
+          - not_null
+          - relationships: {to: ref('stg_client'), field: client_id}
+      - name: as_of_date
+        description: End of the export's date range, else the export date, else the import day.
+        tests: [not_null]
+      - name: as_of_source
+        tests:
+          - accepted_values: {values: [period_end, exported_on, imported_at]}
+      - name: is_latest_upload
+        description: Exactly one upload per client has this true.
+
+  - name: stg_video
+    description: One row per video of one client.
+    columns:
+      - name: video_id
+        tests: [unique, not_null]
+      - name: client_id
+        tests:
+          - not_null
+          - relationships: {to: ref('stg_client'), field: client_id}
+      - name: youtube_video_id
+        description: The 11-character YouTube ID. Unique within a client, not across clients.
+      - name: is_short
+        description: Duration of 60 seconds or less. A proxy, because the export has no Shorts flag.
+    tests:
+      - unique_combination: {columns: [client_id, youtube_video_id]}
+
+  - name: stg_video_metric
+    description: One metric value for one video in one upload, with the catalog's unit and aggregation rule attached.
+    columns:
+      - name: upload_id
+        tests:
+          - not_null
+          - relationships: {to: ref('stg_upload'), field: upload_id}
+      - name: video_id
+        tests:
+          - not_null
+          - relationships: {to: ref('stg_video'), field: video_id}
+      - name: aggregation
+        description: sum, ratio, weighted_avg or none. Decides whether values may be added across videos.
+        tests:
+          - accepted_values: {values: [sum, ratio, weighted_avg, none]}
+      - name: value
+        tests: [not_null]
+    tests:
+      - unique_combination: {columns: [upload_id, video_id, metric_key]}
+
+  - name: stg_upload_total
+    description: The export's Total row, per metric.
+    columns:
+      - name: upload_id
+        tests:
+          - not_null
+          - relationships: {to: ref('stg_upload'), field: upload_id}
+    tests:
+      - unique_combination: {columns: [upload_id, metric_key]}

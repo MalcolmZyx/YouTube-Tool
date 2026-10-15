@@ -1,0 +1,20 @@
+name: yt_analytics
+version: "0.1.0"
+config-version: 2
+profile: yt_analytics
+
+# Run every dbt command from this folder: `dbt build --profiles-dir .`
+model-paths: ["models"]
+test-paths: ["tests"]
+macro-paths: ["macros"]
+
+clean-targets: ["target", "dbt_packages"]
+
+models:
+  yt_analytics:
+    staging:
+      +materialized: view      # cheap to rebuild, always current
+      +schema: staging
+    marts:
+      +materialized: table     # what BI tools read: computed once per build
+      +schema: marts

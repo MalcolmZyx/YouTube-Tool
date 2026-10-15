@@ -22,3 +22,9 @@ __pycache__/
 Thumbs.db
 
 *.xlsx
+# dbt output
+pipeline/dbt/target/
+pipeline/dbt/logs/
+pipeline/dbt/dbt_packages/
+.dbt-venv/
+pipeline/dbt/.user.yml
