@@ -23,8 +23,6 @@ from db.models import (
     UploadTotal,
     Video,
     VideoMetric,
-    VideoPublicMetadata,
-    VideoTag,
 )
 
 SHA_A = "a" * 64
@@ -96,8 +94,6 @@ def test_deleting_a_client_removes_everything_that_belongs_to_it(catalog_session
             [
                 VideoMetric(client_id=client.id, upload_id=upload.id, video_id=video.id, metric_key="views", value=10),
                 UploadTotal(client_id=client.id, upload_id=upload.id, metric_key="views", value=10),
-                VideoPublicMetadata(client_id=client.id, video_id=video.id, availability="public"),
-                VideoTag(client_id=client.id, video_id=video.id, tag="star wars"),
             ]
         )
     session.flush()
@@ -105,7 +101,7 @@ def test_deleting_a_client_removes_everything_that_belongs_to_it(catalog_session
     session.delete(mine)
     session.flush()
 
-    for model in (Upload, Video, VideoMetric, UploadTotal, VideoPublicMetadata, VideoTag):
+    for model in (Upload, Video, VideoMetric, UploadTotal):
         assert count(session, model) == 1, f"{model.__name__} should keep only the other client's row"
     assert session.scalar(select(Client.name)) == "Keep me"
     assert count(session, Metric) > 0  # shared reference data is untouched
@@ -135,15 +131,6 @@ def test_metric_cannot_claim_the_wrong_client(catalog_session):
     assert_rejected(
         session, VideoMetric(client_id=bob.id, upload_id=upload.id, video_id=video.id, metric_key="views", value=1)
     )
-
-
-@pytest.mark.parametrize("model", [VideoTag, VideoPublicMetadata])
-def test_api_data_cannot_attach_to_another_clients_video(db_session, model):
-    alice, bob = make_client(db_session, "Alice"), make_client(db_session, "Bob")
-    video = make_video(db_session, alice)
-    extra = {"tag": "x"} if model is VideoTag else {"availability": "public"}
-
-    assert_rejected(db_session, model(client_id=bob.id, video_id=video.id, **extra))
 
 
 # ── uniqueness ──────────────────────────────────────────────────────────────
@@ -231,14 +218,6 @@ def test_blank_client_names_and_malformed_channel_ids_are_rejected(db_session):
     db_session.flush()
 
 
-@pytest.mark.parametrize("tag", ["Star Wars", " star wars", "star wars ", ""])
-def test_tags_must_be_normalised(db_session, tag):
-    client = make_client(db_session)
-    video = make_video(db_session, client)
-
-    assert_rejected(db_session, VideoTag(client_id=client.id, video_id=video.id, tag=tag))
-
-
 @pytest.mark.parametrize("value", [float("nan"), float("inf"), float("-inf")])
 def test_metric_values_must_be_finite(catalog_session, value):
     session = catalog_session
@@ -269,34 +248,6 @@ def test_metrics_must_exist_in_the_catalog(catalog_session):
     assert_rejected(
         session,
         VideoMetric(client_id=client.id, upload_id=upload.id, video_id=video.id, metric_key="not_a_metric", value=1),
-    )
-
-
-def test_public_metadata_expires_thirty_days_after_it_is_fetched(db_session):
-    client = make_client(db_session)
-    video = make_video(db_session, client)
-    meta = VideoPublicMetadata(client_id=client.id, video_id=video.id, availability="public")
-    db_session.add(meta)
-    db_session.flush()
-    db_session.refresh(meta)
-
-    assert meta.expires_at - meta.fetched_at == datetime.timedelta(days=30)
-
-
-def test_public_metadata_cannot_expire_before_it_was_fetched(db_session):
-    client = make_client(db_session)
-    video = make_video(db_session, client)
-    now = datetime.datetime.now(datetime.UTC)
-
-    assert_rejected(
-        db_session,
-        VideoPublicMetadata(
-            client_id=client.id,
-            video_id=video.id,
-            availability="public",
-            fetched_at=now,
-            expires_at=now - datetime.timedelta(days=1),
-        ),
     )
 
 

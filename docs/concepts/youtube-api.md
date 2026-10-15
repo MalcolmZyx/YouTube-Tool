@@ -16,10 +16,26 @@ The Researcher page also uses it (`search.list`) for competitor tags; that data 
 | Piece | File | Job |
 |---|---|---|
 | Fetcher | `youtube/client.py` | `videos.list`, 50 IDs per request (1 quota unit each); quota and key errors are told apart; the key never appears in an error message |
-| Store | `youtube/store.py` | saves details with `expires_at = now + 30 days`; refreshes data older than 7 days; hides expired data |
-| Purge | `python -m youtube purge` | deletes what was not renewed within 30 days; meant to run daily |
+| Store | `youtube/store.py` | MongoDB: one document per client and video holding the raw API snippet; `expires_at = fetched_at + 30 days`; refreshes data older than 7 days; hides expired data |
+| Retention | TTL index `expires_at` | MongoDB deletes each document itself when it expires: the 30-day rule is the database's job, not a job we must remember to run |
+| Purge | `python -m youtube purge` | deletes expired documents right now (the database also does it within about a minute) |
 | Route | `POST /api/clients/{id}/enrich` | fetch what is missing or stale (429 on quota, 502 on other API failures) |
 | Command | `python -m youtube refresh <client_id>` | the same from the terminal |
+
+## Why MongoDB holds this (and Postgres the rest)
+
+* **Different lifetime.** The creator's export is kept as long as the relationship lasts. Public API data must be gone
+  within 30 days. A TTL index (`expireAfterSeconds: 0` on `expires_at`) makes MongoDB delete each document the moment
+  that time passes, so the rule holds even if nobody ever looks at an alert. Verified for real: an expired test
+  document disappeared by itself after 15 seconds (the TTL monitor runs about once a minute).
+* **Different shape.** What is stored is exactly the snippet YouTube returned, whatever fields it has. The fields the app
+  uses (description, tags, thumbnail) are derived when read, so a new use of the same data needs no new fetch and no
+  schema change.
+* **Honest limits.** Reads still ignore a document past its expiry, because the TTL monitor is not instant. There is no
+  foreign key between the stores, so deleting a client deletes its documents explicitly and refuses to proceed if
+  MongoDB cannot be reached (otherwise a copy could be left behind, against YouTube's delete-on-request rule).
+* **Optional at runtime.** With no `MONGO_URL` the YouTube features say they are not configured; the dashboard, audit
+  and portal work as before.
 
 ## Quota: what is left today
 
@@ -41,8 +57,9 @@ YouTube's API **does not tell us** the remaining quota, so the app counts what i
 Refreshing and deleting are **manual** until the automation phase, so the app tells you when to act. A banner at the top
 of every page appears for any client whose stored YouTube data
 
-* **expires within 7 days** (amber), or
-* **has expired** (red): it is already hidden from Keywords and Descriptions, only the cleanup is outstanding.
+* **expires within 7 days** (amber), which is the useful one: data silently disappearing at 30 days would leave
+  Keywords and Descriptions empty, so the week's warning is the chance to refresh it. MongoDB deletes expired data
+  within about a minute, so the red "expired" state is rarely seen.
 
 The banner has **Refresh now** (fetches again and renews the 30 days) and **Delete YouTube data** (erases that client's
 tags, descriptions and thumbnails after a confirmation; the exported figures stay). Routes: `GET /api/public-data/alerts`,
@@ -51,10 +68,10 @@ deleting everything expired at once.
 
 ## Rules it follows (YouTube Developer Policies)
 
-* **Public data is kept at most 30 days** (III.E.4.d): `expires_at` on every row; analyses ignore expired rows even
-  if the purge has not run yet; the weekly refresh renews data long before it lapses.
-* **Delete on request within 7 days** (III.E.4.g): deleting a client erases its API data in the same transaction
-  (foreign-key cascade), so it is immediate.
+* **Public data is kept at most 30 days** (III.E.4.d): a TTL index on `expires_at` makes MongoDB delete it; analyses
+  ignore expired documents even before it does; the weekly refresh renews data long before it lapses.
+* **Delete on request within 7 days** (III.E.4.g): deleting a client erases its documents at once (explicitly, since
+  the stores are separate) and refuses to delete if MongoDB cannot be reached.
 * **No cross-channel aggregation** of API data (III.E.2): nothing here compares clients.
 * **Credentials** (III.D.1): one key for this one app, read from `.env`, never committed, never logged.
 
@@ -62,7 +79,7 @@ deleting everything expired at once.
 
 * The exact wording of **III.E.4.h** (derived metrics): keyword scores are computed from API tags. To be read in full
   and settled before this goes beyond private use.
-* A **per-client** quota budget (the meter is for the whole key); **scheduling** the refresh and purge (Task Scheduler or cron, Phase 5).
+* A **per-client** quota budget (the meter is for the whole key); **scheduling** the refresh (Task Scheduler or cron, Phase 5). Deleting is already automatic.
 * **Clients using their own API key**: judged a poor fit for the credential rules; alternatives are a per-client quota
   on our key, or OAuth "connect my channel" for private data.
 * **Comments** (`commentThreads.list`) and how long their text may be kept.
@@ -76,3 +93,4 @@ deleting everything expired at once.
 5. Why is a client's own API key a problem for a shared app?
 6. The API does not report remaining quota. How do we know what is left, and why is it only an estimate?
 7. Why is the quota day computed in the database, in Pacific time?
+8. Why is the raw API data in MongoDB with a TTL index instead of Postgres tables? What does that guarantee, and what does it not?

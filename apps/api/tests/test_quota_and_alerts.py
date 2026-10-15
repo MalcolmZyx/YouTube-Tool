@@ -1,20 +1,21 @@
 """The quota counter, and the alerts about stored YouTube data that needs a manual refresh or delete."""
 import uuid
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 
 import pytest
 import requests
 from fastapi.testclient import TestClient
-from sqlalchemy import func, select, update
+from sqlalchemy import func, select
 from studio_fixtures import ID_A, ID_B, ID_C, SIMPLE_HEADERS, simple_rows, write_xlsx
 
 import deps
 from app import app
 from config import settings
-from db.models import ApiUsage, VideoPublicMetadata, VideoTag
+from db.models import ApiUsage
 from db.session import get_session
 from youtube import quota
-from youtube.status import alerts, delete_public_data
+from youtube.status import alerts
+from youtube.store import delete_client_data
 
 
 class FakeResponse:
@@ -30,7 +31,7 @@ def video(video_id):
 
 
 @pytest.fixture
-def api(catalog_session, monkeypatch):
+def api(catalog_session, monkeypatch, mongo):
     app.dependency_overrides[get_session] = lambda: catalog_session
     monkeypatch.setenv("YOUTUBE_API_KEY", "test-key")
     with TestClient(app) as test_client:
@@ -53,10 +54,11 @@ def enrich(api, client_id, monkeypatch, ids=(ID_A, ID_B, ID_C)):
     return api.post(f"/api/clients/{client_id}/enrich")
 
 
-def age(session, days_left):
-    """Make every stored row expire `days_left` days from now (negative: already expired)."""
-    session.execute(update(VideoPublicMetadata).values(
-        fetched_at=func.now() - timedelta(days=40), expires_at=func.now() + timedelta(days=days_left)))
+def age(mongo, days_left):
+    """Make every stored document expire `days_left` days from now (negative: already expired)."""
+    now = datetime.now(UTC)
+    expires = now + timedelta(days=days_left)
+    mongo.update_many({}, {"$set": {"fetched_at": now - timedelta(days=40), "expires_at": expires}})
 
 
 # ── quota ───────────────────────────────────────────────────────────────────
@@ -146,9 +148,9 @@ def test_fresh_data_raises_no_alert(api, client_id, monkeypatch):
     assert api.get("/api/public-data/alerts").json() == []
 
 
-def test_data_expiring_within_a_week_raises_a_warning(api, client_id, catalog_session, monkeypatch):
+def test_data_expiring_within_a_week_raises_a_warning(api, client_id, mongo, monkeypatch):
     enrich(api, client_id, monkeypatch)
-    age(catalog_session, days_left=5)
+    age(mongo, days_left=5)
 
     (alert,) = api.get("/api/public-data/alerts").json()
 
@@ -156,9 +158,9 @@ def test_data_expiring_within_a_week_raises_a_warning(api, client_id, catalog_se
     assert (alert["expiring_soon"], alert["expired"]) == (3, 0)
 
 
-def test_expired_data_is_an_alert_and_is_already_hidden_from_the_analyses(api, client_id, catalog_session, monkeypatch):
+def test_expired_data_is_an_alert_and_is_already_hidden_from_the_analyses(api, client_id, mongo, monkeypatch):
     enrich(api, client_id, monkeypatch)
-    age(catalog_session, days_left=-2)
+    age(mongo, days_left=-2)
 
     (alert,) = api.get("/api/public-data/alerts").json()
 
@@ -166,9 +168,9 @@ def test_expired_data_is_an_alert_and_is_already_hidden_from_the_analyses(api, c
     assert api.get(f"/api/clients/{client_id}/descriptions").json()["total"] == 0
 
 
-def test_refreshing_clears_the_alert(api, client_id, catalog_session, monkeypatch):
+def test_refreshing_clears_the_alert(api, client_id, mongo, monkeypatch):
     enrich(api, client_id, monkeypatch)
-    age(catalog_session, days_left=2)
+    age(mongo, days_left=2)
     assert len(api.get("/api/public-data/alerts").json()) == 1
 
     enrich(api, client_id, monkeypatch)  # the button the banner offers
@@ -176,20 +178,25 @@ def test_refreshing_clears_the_alert(api, client_id, catalog_session, monkeypatc
     assert api.get("/api/public-data/alerts").json() == []
 
 
-def test_deleting_public_data_clears_the_alert_and_keeps_the_export(api, client_id, catalog_session, monkeypatch):
+def test_deleting_public_data_clears_the_alert_and_keeps_the_export(api, client_id, mongo, monkeypatch):
     enrich(api, client_id, monkeypatch)
-    age(catalog_session, days_left=2)
+    age(mongo, days_left=2)
 
     response = api.delete(f"/api/clients/{client_id}/public-data")
 
     assert response.json() == {"deleted_videos": 3}
     assert api.get("/api/public-data/alerts").json() == []
-    assert catalog_session.scalar(select(func.count()).select_from(VideoTag)) == 0
+    assert mongo.count_documents({}) == 0
     assert api.get(f"/api/clients/{client_id}/dashboard").json()["rows"]  # the creator's figures are untouched
     assert api.delete(f"/api/clients/{uuid.uuid4()}/public-data").status_code == 404
 
 
-def test_alerts_function_ignores_clients_without_stored_data(catalog_session):
+def test_alerts_function_ignores_clients_without_stored_data(catalog_session, mongo):
     assert alerts(catalog_session) == []
-    assert delete_public_data(catalog_session, uuid.uuid4()) == 0
-    assert catalog_session.scalar(select(func.count()).select_from(VideoPublicMetadata)) == 0
+    assert delete_client_data(uuid.uuid4()) == 0
+
+
+def test_no_alerts_when_the_store_is_not_configured(catalog_session, monkeypatch):
+    monkeypatch.setattr(settings, "mongo_url", "")
+
+    assert alerts(catalog_session) == []

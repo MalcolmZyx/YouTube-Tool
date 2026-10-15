@@ -15,6 +15,7 @@ from ingest.importer import ImportRejected, Period, import_export
 from intake import spool_upload
 from portal import client as portal
 from schemas import ClientDeletedOut, ClientIn, ClientOut, ImportOut, PeriodIn, UploadOut
+from youtube import store
 
 router = APIRouter(prefix="/clients", tags=["clients"])
 
@@ -85,6 +86,13 @@ def delete_client(client_id: uuid.UUID, session: SessionDep) -> ClientDeletedOut
             portal.unpublish(client_id)
         except portal.PortalError as exc:
             detail = f"Not deleted: {exc} Try again when the portal is reachable."
+            raise HTTPException(status_code=502, detail=detail) from None
+    # Same for the public YouTube data in MongoDB (deletion on request must be prompt): never leave a copy behind.
+    if store.is_configured():
+        try:
+            store.delete_client_data(client_id)
+        except store.StoreError as exc:
+            detail = f"Not deleted: {exc} Try again when it is reachable."
             raise HTTPException(status_code=502, detail=detail) from None
     deleted = {
         "uploads": session.scalar(select(func.count()).select_from(Upload).where(Upload.client_id == client_id)),

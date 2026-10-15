@@ -14,8 +14,6 @@ erDiagram
     upload ||--o{ video_metric : "reports"
     upload ||--o{ upload_total : "summarised by"
     video  ||--o{ video_metric : "measured by"
-    video  ||--o| video_public_metadata : "described by (API)"
-    video  ||--o{ video_tag : "tagged (API)"
     metric ||--o{ video_metric : "defines"
     metric ||--o{ upload_total : "defines"
     metric ||--o{ metric_alias : "also known as"
@@ -59,15 +57,18 @@ Every table except `metric` and `metric_alias` also carries `client_id` (omitted
 | `upload_total` | one number from the export's `Total` row | the `Total` row summarises videos, so it is not a video |
 | `metric` | a kind of measurement | the catalog: unit, how it combines, whether it is reviewed |
 | `metric_alias` | a spelling of a column header | lets renamed Studio headers map to one metric |
-| `video_public_metadata` | API-fetched description, thumbnail, category | expires after 30 days |
-| `video_tag` | one tag on one video | API-fetched, so it expires with the metadata |
+| *(not in Postgres)* | public YouTube data: description, tags, thumbnail | lives in MongoDB with a 30-day TTL, see D1 |
 
 ## Decisions
 
-**D1. Keep API data apart from export data.** YouTube's policy requires API-fetched data to be refreshed or
-deleted within 30 days; a creator's export has no such limit. Separate tables mean one cleanup job
-(`expires_at` is indexed) can never touch export figures. *Rejected:* nullable API columns on `video`, which
-would make the cleanup a column-by-column update.
+**D1. Keep API data apart from export data, in a different store.** YouTube's policy requires API-fetched data to
+be refreshed or deleted within 30 days; a creator's export has no such limit. The two kinds of data also differ in shape:
+the API's is raw JSON whose layout is YouTube's, ours is tidy tables. So the API data lives in MongoDB
+([youtube-api.md](youtube-api.md)), where a TTL index makes the database delete each document itself after 30 days, and
+nothing that cleans it up can ever touch export figures. *Changed from:* first built as two Postgres tables
+(`video_public_metadata`, `video_tag`) with an `expires_at` column and a cleanup job; moved once the TTL index made the
+retention rule a property of the database instead of a job that has to keep running. *Rejected:* nullable API columns
+on `video`, which would make the cleanup a column-by-column update.
 
 **D2. Long format plus a metric catalog.** Studio has about 60 metrics and each client exports a different
 subset. A column per metric needs a migration for every new one and is half empty; a JSON blob per row has no
@@ -124,7 +125,7 @@ export samples exist. Comments wait for the comment-intelligence phase.
 3. Why does `video_metric` repeat `client_id` when `upload_id` already identifies the client?
 4. What does a missing `video_metric` row mean, and how is that different from a row with value `0`?
 5. Why long format here, and what does it cost? Where do wide tables come from?
-6. Why are API-fetched fields in separate tables?
+6. Why is the API-fetched data kept in MongoDB and not Postgres? What does the TTL index buy?
 7. How is "delete my data" guaranteed, and how is it tested?
 8. Why UUID for `client` but integers elsewhere?
 9. What happens when an export contains a column the system has never seen?

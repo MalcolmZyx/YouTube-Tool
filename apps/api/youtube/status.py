@@ -1,16 +1,19 @@
-"""Which clients' stored YouTube data needs attention, and deleting it by hand.
+"""Which clients' stored YouTube data is about to expire, so it can be refreshed or deleted by hand.
 
-Refreshing and deleting are manual for now (automation comes later), so the UI needs to be told when to ask.
-Data that has expired is already hidden from the analyses; "expiring" is the warning before that happens.
+MongoDB deletes each document by itself 30 days after it was fetched (the TTL index in store.py). That guarantees the
+retention rule, but it also means data would silently vanish and the Keywords and Descriptions pages would go empty.
+The alert gives a week's warning, with a button to refresh. Refreshing and deleting stay manual for now.
 """
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
-from sqlalchemy import delete, func, select
+from pymongo.errors import PyMongoError
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from db.models import Client, Video, VideoPublicMetadata, VideoTag
+from db.models import Client
+from youtube import store
 
 WARN_BEFORE = timedelta(days=7)
 
@@ -20,7 +23,7 @@ class PublicDataAlert:
     client_id: uuid.UUID
     client_name: str
     stored: int
-    expired: int
+    expired: int  # normally 0: expired documents are deleted within about a minute
     expiring_soon: int
     next_expiry: datetime | None
 
@@ -30,28 +33,26 @@ class PublicDataAlert:
 
 
 def alerts(session: Session) -> list[PublicDataAlert]:
-    """Clients with stored YouTube data that has expired or will within a week. Most urgent first."""
-    meta = VideoPublicMetadata
-    rows = session.execute(
-        select(
-            Client.id, Client.name,
-            func.count().label("stored"),
-            func.count().filter(meta.expires_at <= func.now()).label("expired"),
-            func.count().filter(
-                (meta.expires_at > func.now()) & (meta.expires_at <= func.now() + WARN_BEFORE)
-            ).label("soon"),
-            func.min(meta.expires_at).label("next_expiry"),
-        )
-        .join(Video, Video.client_id == Client.id)
-        .join(meta, (meta.client_id == Video.client_id) & (meta.video_id == Video.id))
-        .group_by(Client.id, Client.name)
-    ).all()
-    found = [PublicDataAlert(*row) for row in rows if row.expired or row.soon]
+    """Clients whose stored YouTube data expires within a week (or already has). Most urgent first."""
+    if not store.is_configured():
+        return []
+    now = store.utcnow()
+    try:
+        groups = store.collection().aggregate([{"$group": {
+            "_id": "$client_id",
+            "stored": {"$sum": 1},
+            "expired": {"$sum": {"$cond": [{"$lte": ["$expires_at", now]}, 1, 0]}},
+            "soon": {"$sum": {"$cond": [{"$and": [
+                {"$gt": ["$expires_at", now]}, {"$lte": ["$expires_at", now + WARN_BEFORE]}]}, 1, 0]}},
+            "next_expiry": {"$min": "$expires_at"},
+        }}])
+        rows = list(groups)
+    except PyMongoError as exc:
+        raise store.StoreError(f"Could not read from MongoDB ({type(exc).__name__}).") from None
+
+    names = {str(c.id): (c.id, c.name) for c in session.scalars(select(Client))}
+    found = [
+        PublicDataAlert(names[r["_id"]][0], names[r["_id"]][1], r["stored"], r["expired"], r["soon"], r["next_expiry"])
+        for r in rows if r["_id"] in names and (r["expired"] or r["soon"])
+    ]
     return sorted(found, key=lambda a: (not a.expired, a.next_expiry))
-
-
-def delete_public_data(session: Session, client_id: uuid.UUID) -> int:
-    """Erase all stored YouTube data for a client (the export data is untouched). Returns the videos affected."""
-    session.execute(delete(VideoTag).where(VideoTag.client_id == client_id))
-    result = session.execute(delete(VideoPublicMetadata).where(VideoPublicMetadata.client_id == client_id))
-    return result.rowcount

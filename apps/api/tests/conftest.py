@@ -30,6 +30,38 @@ def _no_network(monkeypatch):
     monkeypatch.setenv("YOUTUBE_API_KEY", "")
 
 
+# ── MongoDB fixture ─────────────────────────────────────────────────────────
+#
+# Public YouTube data lives in MongoDB. Tests that need it use a throw-away database ("ytstudio_test"), dropped before
+# and after. Without a reachable MongoDB they are skipped, unless REQUIRE_MONGO=1 (set in CI).
+
+
+@pytest.fixture
+def mongo(monkeypatch):
+    from pymongo import MongoClient
+    from pymongo.errors import PyMongoError
+
+    from config import settings
+    from youtube import store
+
+    url = os.environ.get("TEST_MONGO_URL", "mongodb://ytstudio:ytstudio_dev@127.0.0.1:27017/?authSource=admin")
+    client = MongoClient(url, serverSelectionTimeoutMS=2000, tz_aware=True)
+    try:
+        client.admin.command("ping")
+    except PyMongoError:
+        if os.environ.get("REQUIRE_MONGO") == "1":
+            raise
+        pytest.skip("MongoDB is not reachable; run `docker compose up -d`")
+    monkeypatch.setattr(settings, "mongo_url", url)
+    monkeypatch.setattr(settings, "mongo_db", "ytstudio_test")
+    client.drop_database("ytstudio_test")
+    store._prepare.cache_clear()  # so the indexes are created in the fresh database
+    yield client["ytstudio_test"][store.COLLECTION]
+    client.drop_database("ytstudio_test")
+    store._prepare.cache_clear()
+    client.close()
+
+
 # ── database fixtures ───────────────────────────────────────────────────────
 #
 # Database tests run against a throw-away database ("ytstudio_test") on the same Postgres server
