@@ -76,6 +76,66 @@ function Inbox({ onChange }) {
   )
 }
 
+const RESULT = {
+  imported: { label: 'Imported', color: 'green' }, duplicate: { label: 'Already had it', color: 'default' },
+  rejected: { label: 'Rejected', color: 'red' }, skipped: { label: 'Left waiting', color: 'amber' },
+}
+
+// Files clients uploaded in the portal. Nothing is pushed in: this button reaches out and pulls them.
+function Uploads({ onDone }) {
+  const { get, post } = useApi()
+  const { dataChanged } = useClient()
+  const [waiting, setWaiting] = useState(null)
+  const [results, setResults] = useState([])
+  const [busy, setBusy] = useState(false)
+
+  const load = useCallback(() => get('/portal/inbox').then(setWaiting).catch(() => setWaiting(null)), [get])
+  useEffect(() => { load() }, [load])
+
+  const pull = async () => {
+    setBusy(true)
+    try {
+      const outcomes = await post('/portal/inbox/pull')
+      setResults(outcomes)
+      toast.success(`${outcomes.filter(o => o.result === 'imported').length} imported`)
+      await load()
+      dataChanged()
+      onDone?.()
+    } catch (err) { toast.error(err.message) } finally { setBusy(false) }
+  }
+
+  if (waiting === null) return null
+  return (
+    <section className="card mb-6">
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="font-display font-bold text-base">Client uploads</h2>
+        <button className="btn btn-primary" disabled={busy || waiting.length === 0} onClick={pull}>
+          {busy ? 'Importing…' : waiting.length ? `Import ${waiting.length} waiting` : 'Nothing waiting'}
+        </button>
+      </div>
+      <ul className="text-sm space-y-1">
+        {waiting.map(u => (
+          <li key={u.id}>
+            <span className="font-semibold">{u.client_name ?? 'Unknown client'}</span> · {u.original_filename}
+            <span className="text-xs ml-2" style={{ color: 'var(--text-muted)' }}>{(u.size_bytes / 1024).toFixed(0)} KB</span>
+          </li>
+        ))}
+      </ul>
+      {results.length > 0 && (
+        <ul className="mt-3 pt-3 border-t text-sm space-y-1" style={{ borderColor: 'var(--surface-border)' }}>
+          {results.map(r => (
+            <li key={r.inbox_id} className="flex items-center gap-2">
+              <Badge color={RESULT[r.result].color}>{RESULT[r.result].label}</Badge>
+              <span>{r.client_name ?? 'Unknown client'} · {r.filename}</span>
+              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{r.detail}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  )
+}
+
 function Access({ client }) {
   const { get, put, del } = useApi()
   const [permissions, setPermissions] = useState([])
@@ -145,6 +205,7 @@ export default function Requests() {
   return (
     <div className="animate-fade-in max-w-4xl">
       <PageHeader title="Requests" subtitle="Requests, access and focus choices from the client portal" />
+      <Uploads />
       <Inbox onChange={loadStatus} />
       {client ? <Access client={client} /> : <EmptyState icon="📬" title="No client selected" desc="Pick a client in the sidebar." />}
     </div>
