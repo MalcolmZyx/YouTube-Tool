@@ -229,6 +229,31 @@ def test_upload_inbox_rows_must_be_the_clients_own_and_pending(db, world):
     assert rejected(db, "delete from upload_inbox")
 
 
+def test_a_client_cannot_write_the_result_the_admin_reports_back(db, world):
+    become(db, world["a"]["user"])
+    own = world["a"]["client"]
+    sql = ("insert into upload_inbox (client_id, storage_path, original_filename, size_bytes, sha256, {col}) "
+           "values (%s, %s, 'x.csv', 10, %s, {val})")
+
+    assert rejected(db, sql.format(col="message", val="'Imported 999 videos.'"), (own, f"{own}/x.csv", SHA))
+    assert rejected(db, sql.format(col="status", val="'rejected'"), (own, f"{own}/x.csv", SHA))
+    assert rejected(db, "update upload_inbox set message = 'all good'")
+
+
+def test_the_admin_side_can_report_a_result_and_the_client_can_read_it(db, world):
+    own = world["a"]["client"]
+    become_admin(db)
+    run(db, "insert into upload_inbox (client_id, storage_path, original_filename, size_bytes, sha256) "
+            "values (%s, %s, 'x.csv', 10, %s)", (own, f"{own}/x.csv", SHA))
+    run(db, "update upload_inbox set status = 'rejected', message = 'Unrecognised export' where client_id = %s", (own,))
+    become(db, world["a"]["user"])
+
+    assert run(db, "select status, message from upload_inbox") == [("rejected", "Unrecognised export")]
+    become_admin(db)
+    assert rejected(db, "update upload_inbox set status = 'imported'")  # only the three known statuses exist
+    assert rejected(db, "update upload_inbox set message = %s", ("x" * 301,))  # the message is capped
+
+
 # ── the file bucket ─────────────────────────────────────────────────────────
 
 OBJECT = ("insert into storage.objects (bucket_id, name, owner, metadata) values ('inbox', %s, %s, '{}')")
@@ -263,7 +288,7 @@ def test_the_bucket_is_private_and_capped(db, world):
     public, limit, types = run(
         db, "select public, file_size_limit, allowed_mime_types from storage.buckets where id = 'inbox'")[0]
 
-    assert public is False and limit == 5 * 1024 * 1024 and len(types) == 2
+    assert public is False and limit == 5 * 1024 * 1024 and len(types) == 3
 
 
 # ── the service key still works (the admin app's path) ──────────────────────

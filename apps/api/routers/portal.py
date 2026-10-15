@@ -10,13 +10,16 @@ import deps
 from db.models import Client
 from portal import client as portal
 from portal.publish import publish_client
+from portal.pull import pull_inbox
 from routers.clients import _get_client
 from schemas import (
+    InboxItemOut,
     PermissionIn,
     PermissionOut,
     PortalRequestOut,
     PortalStatusOut,
     PreferenceOut,
+    PullOutcomeOut,
     RequestStatusIn,
 )
 from services.client_data import NoUpload
@@ -145,3 +148,25 @@ def get_preferences(client_id: uuid.UUID, session: deps.SessionDep) -> dict:
         return portal.get_preference(client_id)
     except portal.PortalError as exc:
         raise _portal_error(exc) from None
+
+
+@requests_router.get("/inbox", response_model=list[InboxItemOut])
+def list_inbox(session: deps.SessionDep) -> list[InboxItemOut]:
+    """Files clients have uploaded to the portal that are waiting to be pulled."""
+    try:
+        rows = portal.list_inbox("pending")
+    except portal.PortalError as exc:
+        raise _portal_error(exc) from None
+    names = {c.id: c.name for c in session.scalars(select(Client))}
+    return [InboxItemOut(client_name=names.get(uuid.UUID(r["client_id"])), **{
+        k: r[k] for k in ("id", "client_id", "original_filename", "size_bytes", "created_at")}) for r in rows]
+
+
+@requests_router.post("/inbox/pull", response_model=list[PullOutcomeOut])
+def pull(session: deps.SessionDep) -> list[PullOutcomeOut]:
+    """Import every waiting upload through the normal importer, tell each client, and delete the online copy."""
+    try:
+        outcomes = pull_inbox(session)
+    except portal.PortalError as exc:
+        raise _portal_error(exc) from None
+    return [PullOutcomeOut(**vars(o)) for o in outcomes]

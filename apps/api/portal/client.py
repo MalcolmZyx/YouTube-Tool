@@ -8,6 +8,7 @@ import math
 import os
 from datetime import date, datetime
 from typing import Any
+from urllib.parse import quote
 
 import requests
 
@@ -149,3 +150,63 @@ def get_preference(client_id) -> dict:
     rows = _request("GET", "dashboard_preference",
                     params={"client_id": f"eq.{client_id}", "select": "focus,updated_at"}).json()
     return rows[0] if rows else {"focus": {}, "updated_at": None}
+
+
+# ── the upload inbox ────────────────────────────────────────────────────────────────────────────────────────────────
+# Clients put files in a private bucket under their own folder. The admin app downloads them with the service key, so
+# every path is checked here before it is used: the service key can read the whole bucket.
+
+MAX_DOWNLOAD_BYTES = 5 * 1024 * 1024
+
+
+def list_inbox(status_filter: str = "pending") -> list[dict]:
+    return _request("GET", "upload_inbox", params={
+        "select": "id,client_id,storage_path,original_filename,size_bytes,sha256,status,message,created_at",
+        "status": f"eq.{status_filter}", "order": "created_at", "limit": "200"}).json()
+
+
+def safe_storage_path(client_id, storage_path: str) -> bool:
+    """True only for `<client_id>/<name>` with no traversal, no empty or hidden segments, no backslashes."""
+    parts = storage_path.split("/")
+    return (
+        len(parts) == 2 and parts[0] == str(client_id) and parts[1] not in ("", ".", "..")
+        and "\\" not in storage_path and "\x00" not in storage_path and len(storage_path) <= 400
+    )
+
+
+def _storage_request(method: str, storage_path: str) -> requests.Response:
+    if not is_configured():
+        raise PortalNotConfigured("The portal is not configured (set PORTAL_URL and PORTAL_SERVICE_KEY in .env).")
+    key = get_service_key()
+    try:
+        response = requests.request(
+            method, f"{settings.portal_url.rstrip('/')}/storage/v1/object/inbox/{quote(storage_path, safe='/')}",
+            headers={"apikey": key, "Authorization": f"Bearer {key}"}, timeout=TIMEOUT, stream=method == "GET",
+        )
+    except requests.RequestException as exc:
+        raise PortalError(f"Could not reach the portal ({type(exc).__name__}).") from None
+    if response.status_code == 404:
+        raise PortalError("The uploaded file is no longer in the portal.")
+    if response.status_code >= 400:
+        raise PortalError(f"The portal refused the request (HTTP {response.status_code}).")
+    return response
+
+
+def download_file(storage_path: str) -> bytes:
+    """Fetch one uploaded file, refusing to read more than the upload limit."""
+    response = _storage_request("GET", storage_path)
+    data = bytearray()
+    for chunk in response.iter_content(64 * 1024):
+        data += chunk
+        if len(data) > MAX_DOWNLOAD_BYTES:
+            raise PortalError("The uploaded file is larger than the limit.")
+    return bytes(data)
+
+
+def delete_file(storage_path: str) -> None:
+    _storage_request("DELETE", storage_path)
+
+
+def set_inbox_result(inbox_id: int, new_status: str, message: str) -> None:
+    _request("PATCH", "upload_inbox", params={"id": f"eq.{inbox_id}"}, prefer="return=minimal",
+             body={"status": new_status, "message": message[:300]})

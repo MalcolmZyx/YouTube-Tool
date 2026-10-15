@@ -114,6 +114,23 @@ class PreferenceOut(BaseModel):
     updated_at: datetime | None
 
 
+class InboxItemOut(BaseModel):
+    id: int
+    client_id: uuid.UUID
+    client_name: str | None
+    original_filename: str
+    size_bytes: int
+    created_at: datetime
+
+
+class PullOutcomeOut(BaseModel):
+    inbox_id: int
+    client_name: str | None
+    filename: str
+    result: str  # imported | duplicate | rejected | skipped
+    detail: str
+
+
 class FindingOut(BaseModel):
     key: str
     title: str

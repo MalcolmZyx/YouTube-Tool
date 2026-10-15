@@ -7,6 +7,7 @@ import Audit from './pages/Audit'
 import Dashboard from './pages/Dashboard'
 import Focus from './pages/Focus'
 import Requests from './pages/Requests'
+import Upload from './pages/Upload'
 import Login from './pages/Login'
 
 const link = ({ isActive }) => `px-3 py-1.5 rounded-lg text-sm ${isActive ? 'font-semibold' : ''}`
@@ -25,6 +26,7 @@ function Shell() {
         <nav className="flex gap-1">
           <NavLink to="/" end className={link} style={linkStyle}>Dashboard</NavLink>
           <NavLink to="/audit" className={link} style={linkStyle}>Audit</NavLink>
+          <NavLink to="/upload" className={link} style={linkStyle}>Upload</NavLink>
           <NavLink to="/requests" className={link} style={linkStyle}>Requests</NavLink>
           <NavLink to="/focus" className={link} style={linkStyle}>Focus</NavLink>
         </nav>
@@ -47,6 +49,7 @@ function Shell() {
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/audit" element={<Audit />} />
+            <Route path="/upload" element={<Upload />} />
             <Route path="/requests" element={<Requests />} />
             <Route path="/focus" element={<Focus />} />
             <Route path="*" element={<Navigate to="/" replace />} />

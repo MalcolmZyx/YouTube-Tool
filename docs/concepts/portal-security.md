@@ -94,6 +94,40 @@ Checked end to end with real logins in a browser: the client asked, the admin ap
 client saw both; client B saw none of A's requests or choices; A could not change a status, grant itself access or write B's
 preferences (403); an oversized note was refused.
 
+## Client uploads (the riskiest part)
+
+A client puts a Studio export in the portal; the admin app pulls it into the normal importer. The path of a file from an
+untrusted person to your database, and what stops it at each step:
+
+1. **In the browser:** only `.csv` / `.xlsx`, under 5 MB, not empty. This is a convenience, not security.
+2. **Storage policy:** the client may add a file only under its own `<client_id>/` folder (no `..`), in a private bucket
+   capped at 5 MB and three MIME types. There is no read, list, overwrite or delete policy, so nobody can fetch an
+   uploaded file back, including the uploader. (Windows reports a `.csv` as `application/vnd.ms-excel`, so that type is
+   allowed; the type is only a first filter.)
+3. **The pull is the real check.** The admin app judges every file itself, because the browser and the bucket are
+   controlled by the client: the storage path must be exactly `<that client's id>/<one plain name>` (the service key can
+   read the whole bucket, so a crafted path like `own/../other/secret.csv` is never downloaded); the extension must be
+   `.csv` or `.xlsx` (`.xlsm` is refused: macros); the size is checked both as declared and as received; the SHA-256 must
+   match what the client declared; an `.xlsx` is a zip, so one that expands past 100 MB is refused; and then it goes
+   through the same importer as an upload you make yourself.
+4. **One file at a time.** Each import runs in its own savepoint, so a bad file undoes only itself and never blocks the
+   others. A portal outage leaves the file waiting; a rejected file is marked with a short reason and removed.
+5. **The result goes back to the client** in a column only the admin app can write (`upload_inbox.message`, 300 characters),
+   so the client cannot forge "Imported 999 videos".
+6. **The file is deleted from the portal** once it is imported or rejected: the raw export is online only until you pull.
+
+File names and notes are untrusted text and are only ever displayed as text. A file with a hostile name is imported as
+an ordinary file.
+
+Checked end to end in a browser: a `.txt` is refused before sending; a real export uploads, a non-export uploads too; the
+files are in the inbox but not even the uploader can download them back, another client cannot download them or plant a
+file in that folder, and sees none of the records; the admin's "Import 2 waiting" imports the real one (30 videos) and
+rejects the other with the importer's reason; both files are gone from the portal; the client sees "Processed" and
+"Could not be used" with the reasons.
+
+**Known gap:** if a client's browser uploads the file but fails before recording it, the file stays in the bucket with no
+row pointing at it (an orphan). It is private and capped but not cleaned up yet.
+
 ## What this does not cover (yet)
 
 * The service key is the master key: its safety is operational (never in the browser, never committed).

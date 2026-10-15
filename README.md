@@ -94,6 +94,8 @@ YouTube-Tool/
 | PUT    | `/api/portal/requests/{id}`      | Approve, decline or finish a request |
 | GET/PUT/DELETE | `/api/clients/{id}/portal/permissions[/{feature}]` | List, grant or deny, and remove a client's access |
 | GET    | `/api/clients/{id}/portal/preferences` | What the client chose to focus on |
+| GET    | `/api/portal/inbox`              | Files clients uploaded to the portal, waiting to be pulled |
+| POST   | `/api/portal/inbox/pull`         | Import every waiting upload (normal importer) and tell each client the outcome |
 | GET    | `/api/quota`                     | YouTube quota used and left today (our own estimate) |
 | GET    | `/api/public-data/alerts`        | Clients whose stored YouTube data expired or expires within 7 days |
 
