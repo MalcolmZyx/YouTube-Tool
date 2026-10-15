@@ -90,6 +90,10 @@ YouTube-Tool/
 | GET    | `/api/clients/{id}/portal`       | Whether the portal is configured and when this client was last published |
 | POST   | `/api/clients/{id}/portal/publish` | Publish the audit and dashboard (export data only) to the portal |
 | DELETE | `/api/clients/{id}/portal/publish` | Remove the client from the portal |
+| GET    | `/api/portal/requests`           | Requests clients made in the portal (`?open_only=true`) |
+| PUT    | `/api/portal/requests/{id}`      | Approve, decline or finish a request |
+| GET/PUT/DELETE | `/api/clients/{id}/portal/permissions[/{feature}]` | List, grant or deny, and remove a client's access |
+| GET    | `/api/clients/{id}/portal/preferences` | What the client chose to focus on |
 | GET    | `/api/quota`                     | YouTube quota used and left today (our own estimate) |
 | GET    | `/api/public-data/alerts`        | Clients whose stored YouTube data expired or expires within 7 days |
 

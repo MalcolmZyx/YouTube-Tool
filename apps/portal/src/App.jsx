@@ -5,6 +5,8 @@ import { useAuth } from './hooks/useAuth'
 import { configured } from './supabase'
 import Audit from './pages/Audit'
 import Dashboard from './pages/Dashboard'
+import Focus from './pages/Focus'
+import Requests from './pages/Requests'
 import Login from './pages/Login'
 
 const link = ({ isActive }) => `px-3 py-1.5 rounded-lg text-sm ${isActive ? 'font-semibold' : ''}`
@@ -23,6 +25,8 @@ function Shell() {
         <nav className="flex gap-1">
           <NavLink to="/" end className={link} style={linkStyle}>Dashboard</NavLink>
           <NavLink to="/audit" className={link} style={linkStyle}>Audit</NavLink>
+          <NavLink to="/requests" className={link} style={linkStyle}>Requests</NavLink>
+          <NavLink to="/focus" className={link} style={linkStyle}>Focus</NavLink>
         </nav>
         <div className="ml-auto flex items-center gap-3 text-sm">
           {clients.length > 1 && (
@@ -43,6 +47,8 @@ function Shell() {
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/audit" element={<Audit />} />
+            <Route path="/requests" element={<Requests />} />
+            <Route path="/focus" element={<Focus />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         )}

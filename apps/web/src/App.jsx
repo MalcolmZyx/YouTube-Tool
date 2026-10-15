@@ -3,6 +3,7 @@ import Sidebar from './components/Sidebar'
 import StatusAlerts from './components/StatusAlerts'
 import Dashboard    from './pages/Dashboard'
 import Audit        from './pages/Audit'
+import Requests     from './pages/Requests'
 import Heatmap      from './pages/Heatmap'
 import Keywords     from './pages/Keywords'
 import Descriptions from './pages/Descriptions'
@@ -19,6 +20,7 @@ export default function App() {
           <Routes>
             <Route path="/"             element={<Dashboard />}    />
             <Route path="/audit"        element={<Audit />}        />
+            <Route path="/requests"     element={<Requests />}     />
             <Route path="/heatmap"      element={<Heatmap />}      />
             <Route path="/keywords"     element={<Keywords />}     />
             <Route path="/descriptions" element={<Descriptions />} />
