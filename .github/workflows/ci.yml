@@ -74,3 +74,57 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: npm audit --audit-level=high
+
+  dbt:
+    # Rebuilds the whole pipeline from nothing: schema, fake channels, dbt models and tests, then checks that the SQL
+    # marts agree with the Python audit.
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: ytstudio
+          POSTGRES_PASSWORD: ytstudio_dev
+          POSTGRES_DB: ytstudio
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ytstudio -d ytstudio"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: |
+            apps/api/requirements.txt
+            pipeline/requirements-dbt.txt
+      - name: Install the API's dependencies and dbt (separate environments)
+        run: |
+          pip install -r apps/api/requirements.txt
+          python -m venv .dbt-venv
+          .dbt-venv/bin/pip install -r pipeline/requirements-dbt.txt
+      - name: Create the schema and the fake channels
+        working-directory: apps/api
+        run: |
+          python -m alembic upgrade head
+          python -m db sync-catalog
+          python -m synthetic seed
+      - name: dbt build (models and tests)
+        working-directory: pipeline/dbt
+        run: ../../.dbt-venv/bin/dbt build --profiles-dir .
+      - name: Marts agree with the Python audit
+        run: python pipeline/check_marts_match_audit.py
+      - name: Generate the documentation site
+        working-directory: pipeline/dbt
+        run: ../../.dbt-venv/bin/dbt docs generate --profiles-dir .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dbt-docs
+          path: |
+            pipeline/dbt/target/index.html
+            pipeline/dbt/target/manifest.json
+            pipeline/dbt/target/catalog.json

@@ -1,0 +1,14 @@
+# Connection to the local development database (docker-compose.yml). The defaults are the same development-only
+# values as docker-compose.yml; override with DBT_* variables, never put a real password in this file.
+yt_analytics:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: "{{ env_var('DBT_HOST', '127.0.0.1') }}"
+      port: "{{ env_var('DBT_PORT', '5432') | as_number }}"
+      user: "{{ env_var('DBT_USER', 'ytstudio') }}"
+      password: "{{ env_var('DBT_PASSWORD', 'ytstudio_dev') }}"
+      dbname: "{{ env_var('DBT_DBNAME', 'ytstudio') }}"
+      schema: analytics
+      threads: 4

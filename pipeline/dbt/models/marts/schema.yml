@@ -1,0 +1,68 @@
+version: 2
+
+# The marts are what BI tools (Metabase, Power BI, Tableau) read. Each states its grain: what one row is.
+
+models:
+  - name: mart_video_performance
+    description: >
+      **Grain: one row per video per upload.** A column per headline metric. A blank in the export is NULL here, never 0.
+      Filter on `is_latest_upload` for the current picture.
+    tests:
+      - unique_combination: {columns: [upload_id, video_id]}
+    columns:
+      - name: upload_id
+        tests:
+          - not_null
+          - relationships: {to: ref('stg_upload'), field: upload_id}
+      - name: video_id
+        tests: [not_null]
+      - name: age_days
+        description: Days from publication to the upload's reference date.
+      - name: views_per_day
+        description: Views divided by age in days. Only meaningful for lifetime exports; undefined on the day of publication.
+      - name: views
+        description: Views of the video in the export. Additive across videos.
+      - name: impressions
+        description: Times the thumbnail was shown. Blank for most Shorts. Additive.
+      - name: impressions_ctr_pct
+        description: Click-through rate in percent. A rate, so never average it across videos; weight it by impressions.
+      - name: avg_percentage_viewed_pct
+        description: Average share of the video watched, in percent. Can exceed 100 for Shorts that loop.
+      - name: avg_view_duration_seconds
+        description: Average watch time per view, in seconds.
+      - name: subscribers_net
+        description: Subscribers gained minus lost. Can be negative.
+
+  - name: mart_channel_cadence
+    description: "**Grain: one row per client per month** with at least one upload, from the client's latest export."
+    tests:
+      - unique_combination: {columns: [client_id, month]}
+    columns:
+      - name: uploads
+        tests:
+          - not_null
+          - positive
+
+  - name: mart_format_summary
+    description: >
+      **Grain: one row per upload per format (Short or long-form).** Descriptive only; the significance test is in the
+      Python audit.
+    tests:
+      - unique_combination: {columns: [upload_id, is_short]}
+    columns:
+      - name: weighted_ctr_pct
+        description: Click rate weighted by impressions. Videos without impressions are excluded, not counted as 0%.
+
+  - name: mart_client_overview
+    description: "**Grain: one row per client.** Headline numbers of the latest export plus two cross-checks."
+    columns:
+      - name: client_id
+        tests: [unique, not_null]
+      - name: listed_vs_total_gap_share
+        description: >
+          Share of the export's Total views not accounted for by the listed videos (deleted videos, channel-level
+          activity). Large values mean the video table is incomplete.
+      - name: top_decile_share
+        description: Share of listed views held by the top 10% of videos. Near 1 means a few hits carry the channel.
+        tests:
+          - between_zero_and_one

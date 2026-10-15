@@ -1,0 +1,20 @@
+version: 2
+
+# The application's own tables (created by Alembic migrations). dbt never writes to them.
+sources:
+  - name: app
+    schema: public
+    description: Tables written by the admin app's importer. One row per fact, long format.
+    tables:
+      - name: client
+        description: A creator whose exports we analyse.
+      - name: upload
+        description: One imported Studio export file.
+      - name: video
+        description: One video of one client (the same YouTube video under two clients is two rows).
+      - name: video_metric
+        description: One value of one metric for one video in one upload. A blank in the export is no row, never 0.
+      - name: upload_total
+        description: The export's own Total row, per metric. It is a summary, not a video.
+      - name: metric
+        description: The metric catalog. What each metric key means, its unit and how it may be aggregated.
