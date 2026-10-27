@@ -115,16 +115,16 @@ def test_enrich_spends_one_unit_per_fifty_videos(api, client_id, monkeypatch):
     assert api.get("/api/quota").json()["used_today"] == 1
 
 
-def test_a_search_spends_a_hundred_units_and_a_failed_one_nothing(api, monkeypatch):
+def test_a_search_spends_nothing_from_the_main_pool_only_its_details_call_does(api, monkeypatch):
     monkeypatch.setattr(deps.researcher_svc, "search", lambda **kw: [
         {"video_id": ID_A, "title": "T", "url": "u", "channel": "c", "published_at": "2024-01-01", "views": 1,
          "likes": 0, "comment_count": 0, "tags": [], "thumbnail": "", "description": ""}])
     assert api.post("/api/researcher/search", json={"query": "x"}).status_code == 200
-    assert api.get("/api/quota").json()["used_today"] == 101
+    assert api.get("/api/quota").json()["used_today"] == 1  # search: own bucket; details: 1
 
     monkeypatch.setattr(deps.researcher_svc, "search", lambda **kw: [])
     api.post("/api/researcher/search", json={"query": "y"})
-    assert api.get("/api/quota").json()["used_today"] == 201  # no results: the search only
+    assert api.get("/api/quota").json()["used_today"] == 1  # no results: no details call, nothing spent
 
 
 def test_a_refusal_from_youtube_zeroes_what_is_left_and_stops_further_calls(api, client_id, monkeypatch):

@@ -44,7 +44,7 @@ YouTube's API **does not tell us** the remaining quota, so the app counts what i
 
 * **The period is one day**, and YouTube's day is **Pacific time**, resetting at midnight there. Postgres works that out
   (it knows the time-zone rules), so it is right across daylight-saving changes.
-* **Costs counted:** a batch of up to 50 videos is 1 unit; a Researcher search is 100 (+1 for its details call).
+* **Costs counted:** a batch of up to 50 videos is 1 unit; a Researcher search is in its own bucket of 100 calls a day since 2026-06-01 (not counted here), plus 1 for its details call.
 * **It is an estimate.** It cannot see other uses of the same key (another script, the Google console's own tests), so
   the hover text says so. If YouTube ever answers "quota exceeded", today's count is set to the full limit, so the meter
   agrees with reality and no more calls are made until the reset.

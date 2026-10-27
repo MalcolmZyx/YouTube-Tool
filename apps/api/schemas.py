@@ -336,3 +336,83 @@ class ImportOut(BaseModel):
     period_source: str | None
     new_unreviewed_metrics: list[str]
     warnings: list[str]
+
+
+# ── comment labeling ────────────────────────────────────────────────────────
+
+# Queue modes the API accepts. Only 'random' exists; enriched and uncertainty modes get added here later.
+QueueMode = Literal["random"]
+LabelDepth = Literal["basic", "specific", "advanced"]
+LabelAspect = Literal["audio", "video_quality", "pacing", "content_accuracy", "title_thumbnail", "delivery", "other"]
+
+
+class CommentOut(BaseModel):
+    """A comment to label. The text is plain; the page must show it as text, never as HTML."""
+
+    comment_id: str
+    text: str
+    video_title: str | None
+    like_count: int
+    published_at: datetime | None
+    stratum: dict[str, Any]
+
+
+class QueueOut(BaseModel):
+    mode: QueueMode
+    items: list[CommentOut]
+
+
+class LabelIn(BaseModel):
+    comment_id: str = Field(min_length=1)
+    decision: Literal["constructive", "not_constructive", "discard", "skip"]
+    depth: LabelDepth | None = None
+    aspects: list[LabelAspect] = Field(default_factory=list, max_length=len(LabelAspect.__args__))
+    queue_mode: QueueMode = "random"  # the mode that served the comment
+
+    @field_validator("aspects")
+    @classmethod
+    def _unique(cls, aspects: list[str]) -> list[str]:
+        return list(dict.fromkeys(aspects))
+
+    @model_validator(mode="after")
+    def _tags_only_when_constructive(self):
+        if self.decision != "constructive" and (self.depth or self.aspects):
+            raise ValueError("depth and aspects can only be set on a constructive label")
+        return self
+
+
+class PrevalenceOut(BaseModel):
+    queue_mode: QueueMode
+    n: int
+    constructive: int
+    share: float | None
+    low: float | None  # Wilson 95% interval
+    high: float | None
+    note: str
+
+
+class CategoryCountOut(BaseModel):
+    category_id: str | None
+    constructive: int
+    not_constructive: int
+
+
+class LabelStatsOut(BaseModel):
+    counts: dict[str, int]
+    labeled_total: int  # constructive + not constructive
+    labeled_today: int
+    remaining: int  # in the pool and not yet decided (never seen, or skipped)
+    prevalence: PrevalenceOut
+    by_depth: dict[str, int]
+    by_aspect: dict[str, int]
+    by_category: list[CategoryCountOut]
+
+
+class LabelResultOut(BaseModel):
+    stats: LabelStatsOut
+    next: CommentOut | None
+
+
+class UndoOut(BaseModel):
+    stats: LabelStatsOut
+    undone: CommentOut | None  # the comment to show again, if its text is still available

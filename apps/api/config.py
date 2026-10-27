@@ -45,6 +45,8 @@ class Settings(BaseSettings):
     # features report that instead of failing. Local default: mongodb://ytstudio:ytstudio_dev@127.0.0.1:27017/?authSource=admin
     mongo_url: str = ""
     mongo_db: str = "ytstudio"
+    # Salt for hashing comment authors' channel IDs in the comment corpus. Empty means no author hash is stored at all.
+    comment_author_salt: str = ""
     # SQLAlchemy URL for Postgres. The default matches docker-compose.yml (development only).
     database_url: str = "postgresql+psycopg://ytstudio:ytstudio_dev@127.0.0.1:5432/ytstudio"
 

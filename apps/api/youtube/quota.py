@@ -3,8 +3,10 @@
 The API never tells us the remaining quota, so this is our own count, and an estimate: it cannot see calls made
 with the same key elsewhere. YouTube's quota day runs on Pacific time and resets at midnight there.
 
-Costs (units): `videos.list` 1 per request (up to 50 IDs), `search.list` 100. Writes and Analytics API calls
-are not used.
+Costs (units), verified against developers.google.com/youtube/v3/determine_quota_cost: `videos.list`, `channels.list`,
+`playlistItems.list` and `commentThreads.list` are 1 per request (`videos.list` takes up to 50 IDs). Since 2026-06-01
+`search.list` is no longer 100 units of the main pool: it has its own bucket of 100 calls a day, 1 unit per call, so a
+search never lowers the main meter. Writes and Analytics API calls are not used.
 """
 from dataclasses import dataclass
 from datetime import datetime
@@ -17,7 +19,10 @@ from config import settings
 from db.models import ApiUsage
 
 COST_VIDEOS_LIST = 1
-COST_SEARCH_LIST = 100
+COST_CHANNELS_LIST = 1
+COST_PLAYLIST_ITEMS_LIST = 1
+COST_COMMENT_THREADS_LIST = 1
+COST_SEARCH_LIST = 1  # of the separate search bucket (100 calls a day, client.SEARCH_DAILY_CALLS), not the main pool
 _QUOTA_TZ = "America/Los_Angeles"
 
 # Postgres knows the time-zone rules, so the quota day is computed there, not guessed in Python.
