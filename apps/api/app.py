@@ -12,7 +12,17 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from config import settings
 from errors import register_error_handlers
-from routers import analysis, client_data, clients, dashboard, portal, researcher, system, youtube_status
+from routers import (
+    analysis,
+    client_data,
+    clients,
+    dashboard,
+    labeling,
+    portal,
+    researcher,
+    system,
+    youtube_status,
+)
 from security import configure_logging, register_security
 
 configure_logging()
@@ -39,7 +49,7 @@ app.add_middleware(
 
 register_error_handlers(app)
 
-for module in (system, dashboard, analysis, researcher, clients, client_data, youtube_status, portal):
+for module in (system, dashboard, analysis, researcher, clients, client_data, youtube_status, portal, labeling):
     app.include_router(module.router, prefix="/api")
 app.include_router(portal.requests_router, prefix="/api")
 

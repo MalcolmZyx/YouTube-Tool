@@ -32,6 +32,7 @@ from sqlalchemy import (
     Uuid,
     func,
 )
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from db.base import Base
@@ -45,6 +46,9 @@ AVAILABILITIES = ("public", "unavailable")
 METRIC_UNITS = ("count", "percent", "hours", "minutes", "seconds", "usd", "ratio")
 METRIC_AGGREGATIONS = ("sum", "ratio", "weighted_avg", "none")
 REVIEW_STATUSES = ("reviewed", "unreviewed")
+LABEL_STATUSES = ("constructive", "not_constructive", "discarded", "skipped")
+LABEL_DEPTHS = ("basic", "specific", "advanced")
+LABEL_ASPECTS = ("audio", "video_quality", "pacing", "content_accuracy", "title_thumbnail", "delivery", "other")
 
 
 def _in(column: str, values: tuple[str, ...]) -> str:
@@ -248,3 +252,46 @@ class ApiUsage(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     __table_args__ = (CheckConstraint("units >= 0", name="units_not_negative"),)
+
+
+class CommentLabel(Base):
+    """A decision about one YouTube comment, for the constructive-criticism classifier.
+
+    Comments are a research corpus, not a client's data, so there is no `client_id` and deleting a client never
+    touches this table. The comment itself lives in MongoDB for 30 days; the owner decided that a comment labeled
+    constructive or not constructive keeps its text here permanently, so a label is never left without the text
+    it describes. A discarded comment keeps only its id (so it never comes back) and a skipped one only its id and
+    mode, because neither is wanted in the dataset.
+    """
+
+    __tablename__ = "comment_label"
+
+    comment_id: Mapped[str] = mapped_column(Text, primary_key=True)
+    status: Mapped[str] = mapped_column(Text)
+    depth: Mapped[str | None] = mapped_column(Text)
+    aspects: Mapped[list[str]] = mapped_column(ARRAY(Text), server_default="{}")
+    text: Mapped[str | None] = mapped_column(Text)
+    video_id: Mapped[str | None] = mapped_column(Text)
+    video_title: Mapped[str | None] = mapped_column(Text)
+    stratum: Mapped[dict | None] = mapped_column(JSONB)
+    like_count: Mapped[int | None] = mapped_column(Integer)
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    queue_mode: Mapped[str] = mapped_column(Text)  # which queue served it: needed to weight an unbiased estimate
+    labeled_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    # The row as it was before the latest change, so Undo can put a relabel back. Cleared once used.
+    previous: Mapped[dict | None] = mapped_column(JSONB)
+
+    __table_args__ = (
+        CheckConstraint(_in("status", LABEL_STATUSES), name="status_known"),
+        CheckConstraint(f"depth IS NULL OR {_in('depth', LABEL_DEPTHS)}", name="depth_known"),
+        CheckConstraint(
+            "aspects <@ ARRAY[" + ", ".join(repr(a) for a in LABEL_ASPECTS) + "]::text[]", name="aspects_known"
+        ),
+        CheckConstraint(
+            "status = 'constructive' OR (depth IS NULL AND aspects = '{}')", name="tags_only_when_constructive"
+        ),
+        CheckConstraint(
+            "(status IN ('constructive', 'not_constructive')) = (text IS NOT NULL)", name="text_only_when_kept"
+        ),
+    )
