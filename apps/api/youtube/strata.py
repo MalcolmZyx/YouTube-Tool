@@ -31,7 +31,13 @@ CATEGORIES = {
 }
 
 HIGH_VIEW_BANDS = ("100k-1M", "1M+")
-HIGH_AUDIENCE_SHARE = 0.4  # two of the five view bands: below this share, older bands are searched by view count
+LOW_VIEW_BANDS = ("<1k", "1k-10k")
+LOW_SUBSCRIBER_BANDS = LOW_VIEW_BANDS
+
+# Quota sampling: on every axis each non-empty band is aimed at an equal share of the videos. A video is turned away
+# when its band would pass that share by more than the slack, once the corpus is big enough for shares to mean anything.
+OVER_TARGET_SLACK = 1.25
+MIN_VIDEOS_FOR_QUOTA = 20
 
 Cell = tuple[str, str, str, str]  # category_id, view_band, subscriber_band, age_band
 AXES = ("category_id", "view_band", "subscriber_band", "age_band")
@@ -108,11 +114,8 @@ class Coverage:
                 total.add(count.videos, count.comments)
         return total
 
-    def high_audience_share(self, band: str) -> float:
-        """Share of the age band's videos in the 100k+ view bands; 0 when the band is empty."""
-        total = sum(c.videos for (_, _, _, age), c in self.cells.items() if age == band)
-        high = sum(c.videos for (_, view, _, age), c in self.cells.items() if age == band and view in HIGH_VIEW_BANDS)
-        return high / total if total else 0.0
+    def videos(self) -> int:
+        return sum(count.videos for count in self.axes["age_band"].values())
 
 
 def coverage(rows: Iterable[Mapping]) -> Coverage:
@@ -124,10 +127,38 @@ def coverage(rows: Iterable[Mapping]) -> Coverage:
     return result
 
 
+def over_quota(cov: Coverage, stratum: Mapping) -> str | None:
+    """The first axis on which the video's band already holds more than its share of the corpus, or None.
+
+    The target is an equal share across the bands that hold a video, plus the video's own band, so a band the corpus has
+    never seen is always let in. Below MIN_VIDEOS_FOR_QUOTA videos nothing is turned away."""
+    total = cov.videos()
+    if total < MIN_VIDEOS_FOR_QUOTA:
+        return None
+    for axis in AXES:
+        counts = cov.axes[axis]
+        present = {band for band, count in counts.items() if count.videos} | {stratum[axis]}
+        held = counts[stratum[axis]].videos if stratum[axis] in counts else 0
+        if (held + 1) / (total + 1) > OVER_TARGET_SLACK / len(present):
+            return axis
+    return None
+
+
+def next_view_band(cov: Coverage, rng: random.Random, exclude: Iterable[str] = ()) -> str | None:
+    """The view band with the fewest videos (an empty one first), ties broken by the seeded RNG; None when every band
+    is excluded. The API cannot be asked for a view band, so this only chooses how to search (see `discovery`)."""
+    excluded = set(exclude)
+    ranked = [
+        (cov.axes["view_band"][band].videos if band in cov.axes["view_band"] else 0, rng.random(), band)
+        for band in VIEW_BANDS if band not in excluded
+    ]
+    return min(ranked)[2] if ranked else None
+
+
 def next_targets(
     cov: Coverage, rng: random.Random, n: int = 1, exclude: Iterable[tuple[str, str]] = ()
 ) -> list[tuple[str, str]]:
-    """The (category, age band) pairs to search next: the ones with the fewest kept comments, then the fewest videos.
+    """The (category, age band) pairs to search next: the ones with the fewest videos, then the fewest kept comments.
     Ties are broken by the seeded RNG, so a run is repeatable and equally empty pairs are visited in random order."""
     excluded = set(exclude)
     ranked = []
@@ -135,6 +166,6 @@ def next_targets(
         for band in AGE_BANDS:
             if (category, band) not in excluded:
                 count = cov.pair(category, band)
-                ranked.append((count.comments, count.videos, rng.random(), category, band))
+                ranked.append((count.videos, count.comments, rng.random(), category, band))
     ranked.sort()
     return [(category, band) for *_, category, band in ranked[:n]]
