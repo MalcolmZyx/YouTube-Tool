@@ -616,16 +616,18 @@ def test_a_pair_and_a_view_band_that_yield_nothing_are_dropped_after_a_few_round
     assert chosen[-1][2] is None  # every view band had been given up on
 
 
-def test_a_view_band_that_cannot_be_filled_does_not_hold_the_others_back(mongo, api, fake, monkeypatch):
+def test_a_view_band_that_cannot_be_filled_is_given_up_and_the_run_ends_balanced(mongo, api, fake, monkeypatch):
     chosen = _spy_on_targets(monkeypatch)
     for i in range(30):
         fake.add_video(f"big{i}", f"UCb{i}", views=5_000_000 + i, comments=30, age_days=(3, 60, 200, 500, 2000)[i % 5],
-                       subscribers=800, comments_per_page=(30,))
+                       category=list(strata.CATEGORIES)[i % 5], comments_per_page=(30,),
+                       subscribers=(800, 5_000, 50_000, 500_000, 5_000_000)[i % 5])
     fake.search = [(f"big{i}", f"UCb{i}") for i in range(30)]
 
     summary = crawler.crawl(api, 100, seed=3, now=NOW)
 
-    assert summary.videos_kept == 30  # every video there was, though no round ever found a small one
+    assert summary.videos_kept == strata.MIN_VIDEOS_FOR_QUOTA and summary.stop_reason == "no_new_videos"
+    assert summary.dropped["over_quota_view_band"] > 0
     counts = Counter(v for *_, v in chosen)
     assert all(counts[band] <= crawler.MAX_VIEW_MISSES for band in strata.VIEW_BANDS[:4])
 

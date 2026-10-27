@@ -37,7 +37,8 @@ LOW_SUBSCRIBER_BANDS = LOW_VIEW_BANDS
 # Quota sampling: on every axis each non-empty band is aimed at an equal share of the videos. A video is turned away
 # when its band would pass that share by more than the slack, once the corpus is big enough for shares to mean anything.
 OVER_TARGET_SLACK = 1.25
-MIN_VIDEOS_FOR_QUOTA = 20
+MIN_VIDEOS_FOR_QUOTA = 10
+MIN_QUOTA_BANDS = 3  # an axis counts as having at least this many bands, so a lopsided start cannot lock itself in
 
 Cell = tuple[str, str, str, str]  # category_id, view_band, subscriber_band, age_band
 AXES = ("category_id", "view_band", "subscriber_band", "age_band")
@@ -130,8 +131,9 @@ def coverage(rows: Iterable[Mapping]) -> Coverage:
 def over_quota(cov: Coverage, stratum: Mapping) -> str | None:
     """The first axis on which the video's band already holds more than its share of the corpus, or None.
 
-    The target is an equal share across the bands that hold a video, plus the video's own band, so a band the corpus has
-    never seen is always let in. Below MIN_VIDEOS_FOR_QUOTA videos nothing is turned away."""
+    The target is an equal share across the bands that hold a video, plus the video's own band (at least
+    MIN_QUOTA_BANDS of them), so a band the corpus has never seen is let in. Below MIN_VIDEOS_FOR_QUOTA videos nothing
+    is turned away."""
     total = cov.videos()
     if total < MIN_VIDEOS_FOR_QUOTA:
         return None
@@ -139,7 +141,7 @@ def over_quota(cov: Coverage, stratum: Mapping) -> str | None:
         counts = cov.axes[axis]
         present = {band for band, count in counts.items() if count.videos} | {stratum[axis]}
         held = counts[stratum[axis]].videos if stratum[axis] in counts else 0
-        if (held + 1) / (total + 1) > OVER_TARGET_SLACK / len(present):
+        if (held + 1) / (total + 1) > OVER_TARGET_SLACK / max(len(present), MIN_QUOTA_BANDS):
             return axis
     return None
 

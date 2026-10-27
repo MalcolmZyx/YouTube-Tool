@@ -112,6 +112,14 @@ def test_a_band_the_corpus_has_never_seen_is_let_in_until_it_too_has_its_share()
     assert strata.over_quota(cov, fresh) == "view_band"  # 31 of 91 against 25% + slack for four bands
 
 
+def test_a_corpus_in_one_cell_cannot_lock_itself_in():
+    cov = strata.coverage([_row(CATS[0], "<1k", "<1k", "<1mo", strata.MIN_VIDEOS_FOR_QUOTA, 50)])
+
+    assert strata.over_quota(cov, _stratum(CATS[0], "<1k", "<1k", "<1mo")) == "category_id"
+    assert strata.over_quota(cov, _stratum(CATS[1], "<1k", "<1k", "<1mo")) == "view_band"
+    assert strata.over_quota(cov, _stratum(CATS[1], "1M+", "1M+", "3y+")) is None
+
+
 def test_the_view_band_to_chase_is_the_emptiest_and_ties_follow_the_seed():
     counts = zip(strata.VIEW_BANDS, (3, 9, 4, 9, 9), strict=True)
     cov = strata.coverage([_row("20", band, "<1k", "<1mo", n, 1) for band, n in counts])
