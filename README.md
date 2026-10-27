@@ -18,7 +18,7 @@ YouTube-Tool/
 │   │   ├── intake.py                 ← safe upload handling (size cap, hashing)
 │   │   ├── security.py               ← Origin/Host guards, upload limits, log redaction
 │   │   ├── audit/                    ← the audit engine: findings with evidence and caveats
-│   │   ├── youtube/                  ← batched YouTube client, MongoDB store (30-day TTL), quota count, expiry alerts
+│   │   ├── youtube/                  ← batched YouTube client, MongoDB store (30-day TTL), quota count, expiry alerts, comment crawler
 │   │   ├── synthetic/                ← seeded fake channels in Studio export format
 │   │   ├── db/                       ← SQLAlchemy models, metric catalog + seed data, session
 │   │   ├── migrations/               ← Alembic migrations (schema history)
@@ -132,7 +132,16 @@ why: [docs/concepts/data-model.md](docs/concepts/data-model.md); how exports are
 [docs/concepts/youtube-api.md](docs/concepts/youtube-api.md); the audit and its statistics:
 [docs/concepts/audit.md](docs/concepts/audit.md); portal security and how it is tested:
 [docs/concepts/portal-security.md](docs/concepts/portal-security.md); the dbt analytics layer:
-[docs/concepts/dbt.md](docs/concepts/dbt.md).
+[docs/concepts/dbt.md](docs/concepts/dbt.md); the comment corpus crawler:
+[docs/concepts/comment-collection.md](docs/concepts/comment-collection.md).
+
+The comment crawler builds a research corpus of public comments, balanced across genre, audience size and video age (needs
+`YOUTUBE_API_KEY` and `MONGO_URL`; run from `apps/api`):
+
+```bash
+python -m youtube crawl --videos 200 --seed 1   # find videos in the emptiest cells and sample their comments
+python -m youtube coverage                      # how balanced the corpus is, per axis
+```
 
 ### 2. Backend
 

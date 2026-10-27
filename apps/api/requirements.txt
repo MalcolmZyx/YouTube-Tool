@@ -16,4 +16,6 @@ openpyxl==3.1.5
 defusedxml==0.7.1
 google-api-python-client==2.137.0
 requests==2.33.0
+# Language detection for the comment corpus: pure Python, no model download, seeded for repeatable results.
+langdetect==1.0.9
 python-dotenv==1.2.2

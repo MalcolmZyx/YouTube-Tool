@@ -42,8 +42,8 @@ def researcher_search(body: SearchIn, api_key: deps.ApiKey, session: deps.Sessio
             ) from None
         raise HTTPException(status_code=502, detail=f"YouTube API error: {exc.reason}") from None
 
-    # One search, plus one videos.list when it found anything.
-    quota.record(session, quota.COST_SEARCH_LIST + (quota.COST_VIDEOS_LIST if rows else 0))
+    # The search has its own bucket (see youtube/quota.py); only the videos.list for the details is in the main pool.
+    quota.record(session, quota.COST_VIDEOS_LIST if rows else 0)
     tags = deps.researcher_svc.analyze_tags(rows, top_n=body.top_n)
     return {"videos": rows, "tags": tags, "total": len(rows)}
 
