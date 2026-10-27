@@ -16,6 +16,7 @@ from functools import lru_cache
 
 from pymongo import ASCENDING, MongoClient, ReplaceOne
 from pymongo.collection import Collection
+from pymongo.database import Database
 from pymongo.errors import PyMongoError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -58,6 +59,16 @@ def collection() -> Collection:
         raise StoreNotConfigured("MongoDB is not configured (set MONGO_URL in .env). It stores the YouTube data.")
     try:
         return _prepare(settings.mongo_url, settings.mongo_db)
+    except PyMongoError as exc:
+        raise StoreError(f"Could not reach MongoDB ({type(exc).__name__}).") from None
+
+
+def database() -> Database:
+    """The MongoDB database itself, for code that reads collections other than `youtube_video`."""
+    if not settings.mongo_url:
+        raise StoreNotConfigured("MongoDB is not configured (set MONGO_URL in .env). It stores the YouTube data.")
+    try:
+        return _connect(settings.mongo_url)[settings.mongo_db]
     except PyMongoError as exc:
         raise StoreError(f"Could not reach MongoDB ({type(exc).__name__}).") from None
 
