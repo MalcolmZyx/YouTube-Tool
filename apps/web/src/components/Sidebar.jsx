@@ -13,6 +13,7 @@ const NAV = [
   { to: '/keywords',    icon: TagIcon,      label: 'Keywords'    },
   { to: '/descriptions',icon: DocIcon,      label: 'Descriptions'},
   { to: '/researcher',  icon: SearchIcon,   label: 'Researcher'  },
+  { to: '/labeling',    icon: LabelIcon,    label: 'Label comments' },
   { to: '/settings',    icon: GearIcon,     label: 'Settings'    },
 ]
 
@@ -265,6 +266,14 @@ function InboxIcon({ size = 16 }) {
     <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
       <path d="M2 9l2-6h8l2 6v4a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V9z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/>
       <path d="M2 9h3.5l1 1.5h3L11 9h3" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/>
+    </svg>
+  )
+}
+function LabelIcon({ size = 16 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
+      <path d="M2 3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H7l-3 3v-3H3a1 1 0 0 1-1-1V3z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/>
+      <path d="M5.5 6.5l1.7 1.7L10.5 5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
   )
 }

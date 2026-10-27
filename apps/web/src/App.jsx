@@ -8,6 +8,7 @@ import Heatmap      from './pages/Heatmap'
 import Keywords     from './pages/Keywords'
 import Descriptions from './pages/Descriptions'
 import Researcher   from './pages/Researcher'
+import Labeling     from './pages/Labeling'
 import Settings     from './pages/Settings'
 
 export default function App() {
@@ -25,7 +26,8 @@ export default function App() {
             <Route path="/keywords"     element={<Keywords />}     />
             <Route path="/descriptions" element={<Descriptions />} />
             <Route path="/researcher"   element={<Researcher />}   />
-            <Route path="/settings"     element={<Settings />}     />
+            <Route path="/labeling"     element={<Labeling />}     />
+            <Route path="/settings"    element={<Settings />}     />
           </Routes>
         </div>
       </main>
