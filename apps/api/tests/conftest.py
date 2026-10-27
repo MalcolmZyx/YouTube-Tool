@@ -42,7 +42,7 @@ def mongo(monkeypatch):
     from pymongo.errors import PyMongoError
 
     from config import settings
-    from youtube import store
+    from youtube import comment_store, store
 
     url = os.environ.get("TEST_MONGO_URL", "mongodb://ytstudio:ytstudio_dev@127.0.0.1:27017/?authSource=admin")
     client = MongoClient(url, serverSelectionTimeoutMS=2000, tz_aware=True)
@@ -56,9 +56,11 @@ def mongo(monkeypatch):
     monkeypatch.setattr(settings, "mongo_db", "ytstudio_test")
     client.drop_database("ytstudio_test")
     store._prepare.cache_clear()  # so the indexes are created in the fresh database
+    comment_store._prepare.cache_clear()
     yield client["ytstudio_test"][store.COLLECTION]
     client.drop_database("ytstudio_test")
     store._prepare.cache_clear()
+    comment_store._prepare.cache_clear()
     client.close()
 
 
