@@ -72,10 +72,64 @@ def test_coverage_counts_per_cell_and_per_axis():
     assert cov.pair("20", "<1mo").comments == 65 and cov.pair("20", "3y+").comments == 0
 
 
-def test_high_audience_share_is_zero_for_an_empty_band_and_counts_videos():
-    cov = strata.coverage(_rows())
-    assert cov.high_audience_share("<1mo") == pytest.approx(1 / 3)
-    assert cov.high_audience_share("1y-3y") == 0.0
+CATS = list(strata.CATEGORIES)[:5]
+SUBS = strata.SUBSCRIBER_BANDS[:5]
+
+
+def _balanced(per_band: int, bands: int = 5) -> strata.Coverage:
+    """`per_band` videos in each of the first `bands` bands of every axis, so that every axis is exactly even."""
+    return strata.coverage([
+        _row(CATS[i], strata.VIEW_BANDS[i], SUBS[i], strata.AGE_BANDS[i], per_band, per_band * 3) for i in range(bands)
+    ])
+
+
+def _stratum(category, view, subscribers, age):
+    return {"category_id": category, "view_band": view, "subscriber_band": subscribers, "age_band": age}
+
+
+def test_a_small_corpus_turns_nothing_away():
+    cov = strata.coverage([_row("20", "1M+", "1M+", "<1mo", strata.MIN_VIDEOS_FOR_QUOTA - 1, 10)])
+    assert strata.over_quota(cov, _stratum("20", "1M+", "1M+", "<1mo")) is None
+
+
+def test_a_band_over_its_share_is_turned_away_and_the_axis_is_named():
+    cov = _balanced(20)  # 100 videos, 20% in every band of every axis; the quota allows 25%
+    cov.add((CATS[1], strata.VIEW_BANDS[4], SUBS[2], strata.AGE_BANDS[3]), videos=10)  # 30 of 110 in four bands
+    base = (CATS[0], strata.VIEW_BANDS[0], SUBS[0], strata.AGE_BANDS[0])
+
+    assert strata.over_quota(cov, _stratum(*base)) is None
+    for axis, value in zip(strata.AXES, (CATS[1], strata.VIEW_BANDS[4], SUBS[2], strata.AGE_BANDS[3]), strict=True):
+        candidate = dict(zip(strata.AXES, base, strict=True)) | {axis: value}
+        assert strata.over_quota(cov, candidate) == axis
+
+
+def test_a_band_the_corpus_has_never_seen_is_let_in_until_it_too_has_its_share():
+    cov = _balanced(20, bands=3)  # three view bands at a third each
+    fresh = _stratum(CATS[1], strata.VIEW_BANDS[4], SUBS[1], strata.AGE_BANDS[1])
+    assert strata.over_quota(cov, fresh) is None
+
+    cov.add((CATS[0], strata.VIEW_BANDS[4], SUBS[0], strata.AGE_BANDS[0]), videos=30)
+    assert strata.over_quota(cov, fresh) == "view_band"  # 31 of 91 against 25% + slack for four bands
+
+
+def test_a_corpus_in_one_cell_cannot_lock_itself_in():
+    cov = strata.coverage([_row(CATS[0], "<1k", "<1k", "<1mo", strata.MIN_VIDEOS_FOR_QUOTA, 50)])
+
+    assert strata.over_quota(cov, _stratum(CATS[0], "<1k", "<1k", "<1mo")) == "category_id"
+    assert strata.over_quota(cov, _stratum(CATS[1], "<1k", "<1k", "<1mo")) == "view_band"
+    assert strata.over_quota(cov, _stratum(CATS[1], "1M+", "1M+", "3y+")) is None
+
+
+def test_the_view_band_to_chase_is_the_emptiest_and_ties_follow_the_seed():
+    counts = zip(strata.VIEW_BANDS, (3, 9, 4, 9, 9), strict=True)
+    cov = strata.coverage([_row("20", band, "<1k", "<1mo", n, 1) for band, n in counts])
+    assert strata.next_view_band(cov, random.Random(0)) == "<1k"
+    assert strata.next_view_band(cov, random.Random(0), exclude=["<1k"]) == "10k-100k"
+
+    empty = strata.coverage([])
+    assert len({strata.next_view_band(empty, random.Random(seed)) for seed in range(20)}) > 1
+    assert strata.next_view_band(empty, random.Random(4)) == strata.next_view_band(empty, random.Random(4))
+    assert strata.next_view_band(empty, random.Random(0), exclude=strata.VIEW_BANDS) is None
 
 
 def test_the_scheduler_picks_the_emptiest_pair_first():

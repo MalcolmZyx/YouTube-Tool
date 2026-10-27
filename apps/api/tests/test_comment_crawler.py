@@ -3,6 +3,7 @@
 Every HTTP call goes to `FakeYouTube`; the store tests use the throw-away MongoDB database of the `mongo` fixture.
 """
 import random
+from collections import Counter
 from datetime import timedelta
 
 import pytest
@@ -28,7 +29,7 @@ def api(fake):
 # ── discovery ───────────────────────────────────────────────────────────────
 
 
-def test_search_by_date_asks_for_a_short_window_inside_the_age_band(api, fake):
+def test_search_by_date_asks_for_a_window_inside_the_age_band_that_widens_with_age(api, fake):
     fake.search = [("v1", "UC1"), ("v2", "UC2")]
 
     found = discovery.search_window(api, "20", "1y-3y", NOW, random.Random(1))
@@ -40,10 +41,25 @@ def test_search_by_date_asks_for_a_short_window_inside_the_age_band(api, fake):
     assert params["maxResults"] == 50 and params["part"] == "snippet"
     after, before = (discovery.datetime.strptime(params[k], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=NOW.tzinfo)
                      for k in ("publishedAfter", "publishedBefore"))
-    assert before - after == timedelta(hours=2)
+    assert before - after == timedelta(hours=discovery.DATE_WINDOW_HOURS["1y-3y"])
     assert strata.age_band(after, NOW) == strata.age_band(before, NOW) == "1y-3y"
+    assert params["q"] in discovery.QUERY_WORDS
     assert [(c.video_id, c.channel_id, c.source) for c in found] == [
         ("v1", "UC1", "search_window"), ("v2", "UC2", "search_window")]
+
+    hours = [discovery.DATE_WINDOW_HOURS[band] for band in strata.AGE_BANDS]
+    assert hours == sorted(hours) and hours[0] == 2
+
+
+def test_the_common_word_of_a_date_search_comes_from_the_seed(fake):
+    def words(seed):
+        rng, api, chosen = random.Random(seed), Api(KEY, fake), []
+        for _ in range(12):
+            discovery.search_window(api, "20", "<1mo", NOW, rng)
+            chosen.append(fake.calls[-1][1]["q"])
+        return chosen
+
+    assert words(1) == words(1) and set(words(1)) == set(discovery.QUERY_WORDS)
 
 
 def test_search_by_view_count_uses_a_wider_window(api, fake):
@@ -52,7 +68,7 @@ def test_search_by_view_count_uses_a_wider_window(api, fake):
     found = discovery.search_window(api, "10", "3y+", NOW, random.Random(1), by_view_count=True)
 
     params = fake.calls[0][1]
-    assert params["order"] == "viewCount"
+    assert params["order"] == "viewCount" and "q" not in params
     start, end = params["publishedAfter"], params["publishedBefore"]
     assert (discovery.datetime.fromisoformat(end) - discovery.datetime.fromisoformat(start)) == timedelta(hours=72)
     assert found[0].source == "search_viewcount"
@@ -478,6 +494,156 @@ def test_a_crawl_balances_towards_empty_cells(mongo, fake):
 
     first_search = next(p for m, p in fake.calls if m in ("search", "videos") and p.get("videoCategoryId"))
     assert first_search["videoCategoryId"] == "27"
+
+
+# ── steering by audience ────────────────────────────────────────────────────
+
+
+def _corpus(mongo, per_view_band: dict[str, int]):
+    """Crawled videos in the given view bands, spread evenly over five categories, subscriber and age bands."""
+    i = 0
+    for view, n in per_view_band.items():
+        for _ in range(n):
+            stratum = {"category_id": list(strata.CATEGORIES)[i % 5], "view_band": view, "sampling": "x",
+                       "subscriber_band": strata.SUBSCRIBER_BANDS[i % 5], "age_band": strata.AGE_BANDS[i % 5]}
+            mongo.database[comment_store.VIDEO_COLLECTION].insert_one(
+                {"_id": f"old{i}", "stratum": stratum, "expires_at": NOW + timedelta(days=400)})
+            i += 1
+
+
+def _mixed_world(fake, small=6, big=6):
+    for i in range(small):
+        fake.add_video(f"small{i}", f"UCs{i}", views=400 + i, comments=30, age_days=(3, 60, 200)[i % 3],
+                       subscribers=(800, 5_000, 50_000)[i % 3], comments_per_page=(30,))
+    for i in range(big):
+        fake.add_video(f"big{i}", f"UCb{i}", views=5_000_000 + i, comments=30, age_days=(3, 60, 200)[i % 3],
+                       subscribers=(800, 5_000, 50_000)[i % 3], comments_per_page=(30,))
+    fake.search = [(f"small{i}", f"UCs{i}") for i in range(small)] + [(f"big{i}", f"UCb{i}") for i in range(big)]
+
+
+def test_videos_in_an_over_full_band_are_turned_away_before_any_comment_is_read(mongo, api, fake):
+    _corpus(mongo, {"1M+": 28, "100k-1M": 2})
+    _mixed_world(fake, small=3, big=3)
+
+    summary = crawler.crawl(api, 3, seed=1, now=NOW)
+
+    assert summary.videos_kept == 3 and summary.stop_reason == "target_reached"
+    assert summary.dropped["over_quota_view_band"] == 3
+    assert comment_store.known_video_ids(["small0", "small1", "small2"]) == {"small0", "small1", "small2"}
+    assert comment_store.known_video_ids(["big0", "big1", "big2"]) == set()
+    assert fake.count("commentThreads") == 3  # none was spent on the three that were turned away
+
+
+def test_a_run_whose_candidates_are_all_over_quota_gives_up_without_reading_comments(mongo, api, fake):
+    _corpus(mongo, {"1M+": 28, "100k-1M": 2})
+    _mixed_world(fake, small=0, big=6)
+
+    summary = crawler.crawl(api, 3, seed=1, now=NOW)
+
+    assert summary.videos_kept == 0 and summary.stop_reason == "no_new_videos"
+    assert summary.dropped["over_quota_view_band"] >= 6 and fake.count("commentThreads") == 0
+
+
+def test_the_quota_decision_is_repeatable_for_a_seed(mongo, api, fake):
+    def run(seed):
+        comment_store.collections()[0].delete_many({})
+        comment_store.collections()[1].delete_many({})
+        _corpus(mongo, {"1M+": 28, "100k-1M": 2})
+        summary = crawler.crawl(Api(KEY, fake), 4, seed=seed, now=NOW)
+        kept = sorted(d["_id"] for d in comment_store.collections()[1].find({"_id": {"$not": {"$regex": "^old"}}}))
+        return kept, dict(summary.dropped), summary.rounds
+
+    _mixed_world(fake)
+    assert run(5) == run(5)
+    assert all(video.startswith("small") for video in run(5)[0])
+
+
+def test_the_run_summary_names_the_axis_that_turned_videos_away(mongo, db_engine, clean_usage, fake, monkeypatch,
+                                                                capsys):
+    monkeypatch.setenv("YOUTUBE_API_KEY", KEY)
+    _corpus(mongo, {"1M+": 28, "100k-1M": 2})
+    _mixed_world(fake, small=3, big=3)
+
+    assert main(["crawl", "--videos", "3", "--seed", "1"], engine=db_engine, get=fake) == 0
+
+    assert "over_quota_view_band 3" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("emptiest, order, has_word", [("100k-1M", "viewCount", False), ("<1k", "date", True)])
+def test_the_search_follows_the_view_band_the_corpus_lacks(mongo, api, fake, emptiest, order, has_word):
+    _corpus(mongo, {band: 6 for band in strata.VIEW_BANDS if band != emptiest})
+    _mixed_world(fake)
+
+    crawler.crawl(api, 1, seed=2, now=NOW)
+
+    first = next(p for m, p in fake.calls if m == "search")
+    assert first["order"] == order and ("q" in first) is has_word
+
+
+def test_a_low_view_band_reads_a_small_channels_uploads_and_a_high_one_the_chart(api, fake):
+    fake.add_video("v1", "UC1")
+    fake.uploads = {"UCsmall": ["v1"]}
+    fake.charts = {"20": ["v1"]}
+    state = crawler._Crawl(api, 1, NOW, "US")
+    state.search_open, state.small_channels = False, ["UCsmall"]
+
+    assert [c.source for c in state.discover("20", "<1mo", "<1k")] == ["uploads"]
+    assert [c.source for c in state.discover("20", "<1mo", "100k-1M")] == ["most_popular"]
+    assert fake.count("search") == 0
+    assert [c.source for c in state.discover("20", "<1mo", "1k-10k")] == ["most_popular"]  # the channel is used up
+
+
+def test_a_new_run_reads_the_uploads_of_small_channels_already_in_the_corpus(mongo, fake):
+    stratum = {"category_id": "20", "view_band": "<1k", "subscriber_band": "<1k", "age_band": "<1mo"}
+    mongo.database[comment_store.VIDEO_COLLECTION].insert_one(
+        {"_id": "old", "channel_id": "UCsmall", "stratum": stratum, "expires_at": NOW + timedelta(days=400)})
+    fake.add_video("fresh", "UCsmall", views=300, comments=30, age_days=3, subscribers=800, comments_per_page=(30,))
+    fake.uploads = {"UCsmall": ["fresh"]}
+    api = Api(KEY, fake, search_limit=0)
+
+    summary = crawler.crawl(api, 1, seed=1, now=NOW)
+
+    assert summary.videos_kept == 1 and api.calls["search"] == 0
+    assert [v["source"] for v in mongo.database[comment_store.VIDEO_COLLECTION].find({"_id": "fresh"})] == ["uploads"]
+
+
+def _spy_on_targets(monkeypatch):
+    chosen = []
+    original = crawler._Crawl.discover
+
+    def spy(self, category, band, view_band):
+        chosen.append((category, band, view_band))
+        return original(self, category, band, view_band)
+
+    monkeypatch.setattr(crawler._Crawl, "discover", spy)
+    return chosen
+
+
+def test_a_pair_and_a_view_band_that_yield_nothing_are_dropped_after_a_few_rounds(mongo, api, fake, monkeypatch):
+    chosen = _spy_on_targets(monkeypatch)
+
+    summary = crawler.crawl(api, 5, seed=1, now=NOW)
+
+    assert summary.stop_reason == "no_new_videos" and len(chosen) == crawler.MAX_EMPTY_ROUNDS
+    assert max(Counter((c, b) for c, b, _ in chosen).values()) <= crawler.MAX_MISSES
+    assert max(Counter(v for *_, v in chosen if v).values()) <= crawler.MAX_VIEW_MISSES
+    assert chosen[-1][2] is None  # every view band had been given up on
+
+
+def test_a_view_band_that_cannot_be_filled_is_given_up_and_the_run_ends_balanced(mongo, api, fake, monkeypatch):
+    chosen = _spy_on_targets(monkeypatch)
+    for i in range(30):
+        fake.add_video(f"big{i}", f"UCb{i}", views=5_000_000 + i, comments=30, age_days=(3, 60, 200, 500, 2000)[i % 5],
+                       category=list(strata.CATEGORIES)[i % 5], comments_per_page=(30,),
+                       subscribers=(800, 5_000, 50_000, 500_000, 5_000_000)[i % 5])
+    fake.search = [(f"big{i}", f"UCb{i}") for i in range(30)]
+
+    summary = crawler.crawl(api, 100, seed=3, now=NOW)
+
+    assert summary.videos_kept == strata.MIN_VIDEOS_FOR_QUOTA and summary.stop_reason == "no_new_videos"
+    assert summary.dropped["over_quota_view_band"] > 0
+    counts = Counter(v for *_, v in chosen)
+    assert all(counts[band] <= crawler.MAX_VIEW_MISSES for band in strata.VIEW_BANDS[:4])
 
 
 # ── the commands ────────────────────────────────────────────────────────────
