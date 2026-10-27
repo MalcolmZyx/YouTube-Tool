@@ -4,6 +4,7 @@ Cost: `videos.list` is 1 quota unit per request whatever the number of IDs (up t
 20 units of the default 10,000 a day. Only public data is requested, and only `snippet`.
 """
 import logging
+from collections import Counter
 from collections.abc import Callable, Iterable, Iterator
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -23,6 +24,19 @@ class YouTubeError(RuntimeError):
 
 class QuotaExceeded(YouTubeError):
     """The daily quota is used up; retrying today will not help."""
+
+
+class SearchBudgetExhausted(YouTubeError):
+    """The separate daily bucket of `search.list` calls is used up. Every other method still works."""
+
+
+class ApiError(YouTubeError):
+    """Any other refusal by the API. `status` and `reason` let the caller tell a skippable case (comments
+    disabled, a category without a chart) from a real failure."""
+
+    def __init__(self, status: int, reason: str):
+        super().__init__(f"The YouTube API returned an error ({status}, {reason}).")
+        self.status, self.reason = status, reason
 
 
 @dataclass(frozen=True)
@@ -87,27 +101,64 @@ def _error_reason(response: requests.Response) -> str:
         return "unknown"
 
 
+def request_json(url: str, params: dict, api_key: str, get: Callable[..., requests.Response] | None = None) -> dict:
+    """GET one API method and return its JSON body. Errors are translated; no message contains the key."""
+    get = get or requests.get
+    try:
+        response = get(url, params={**params, "key": api_key}, timeout=15)
+    except requests.RequestException as exc:
+        # The exception text can contain the request URL, and the URL contains the key.
+        raise YouTubeError(f"Could not reach the YouTube API ({type(exc).__name__})") from None
+    if response.status_code != 200:
+        reason = _error_reason(response)
+        logger.warning("YouTube API returned %s (%s)", response.status_code, reason)
+        if reason in ("quotaExceeded", "dailyLimitExceeded", "rateLimitExceeded"):
+            raise QuotaExceeded("The YouTube API daily quota is used up. Try again tomorrow.")
+        if reason in ("keyInvalid", "API_KEY_INVALID", "badRequest"):
+            raise YouTubeError("The YouTube API rejected the key. Check it in Settings.")
+        raise ApiError(response.status_code, reason)
+    return response.json()
+
+
 def fetch_videos(
     ids: Iterable[str], api_key: str, get: Callable[..., requests.Response] | None = None
 ) -> dict[str, VideoInfo]:
     """Public details for the given IDs. A private, deleted or unknown video is simply absent from the result."""
-    get = get or requests.get
     found: dict[str, VideoInfo] = {}
     for batch in batches(ids):
-        try:
-            response = get(ENDPOINT, params={"part": "snippet", "id": ",".join(batch), "key": api_key}, timeout=15)
-        except requests.RequestException as exc:
-            # The exception text can contain the request URL, and the URL contains the key.
-            raise YouTubeError(f"Could not reach the YouTube API ({type(exc).__name__})") from None
-        if response.status_code != 200:
-            reason = _error_reason(response)
-            logger.warning("YouTube API returned %s (%s)", response.status_code, reason)
-            if reason in ("quotaExceeded", "dailyLimitExceeded", "rateLimitExceeded"):
-                raise QuotaExceeded("The YouTube API daily quota is used up. Try again tomorrow.")
-            if reason in ("keyInvalid", "API_KEY_INVALID", "badRequest"):
-                raise YouTubeError("The YouTube API rejected the key. Check it in Settings.")
-            raise YouTubeError(f"The YouTube API returned an error ({response.status_code}, {reason}).")
-        for item in response.json().get("items", []):
+        body = request_json(ENDPOINT, {"part": "snippet", "id": ",".join(batch)}, api_key, get)
+        for item in body.get("items", []):
             info = _parse(item)
             found[info.video_id] = info
     return found
+
+
+API_ROOT = "https://www.googleapis.com/youtube/v3/"
+# Every method the crawler calls costs 1 unit per request. `search.list` is charged to its own bucket (since
+# 2026-06-01), limited to 100 calls a day by default; the others share the main pool.
+SEARCH_DAILY_CALLS = 100
+
+
+class Api:
+    """One API key, one HTTP function, and a count of the calls made per method (the crawler's quota accounting)."""
+
+    def __init__(self, api_key: str, get: Callable[..., requests.Response] | None = None,
+                 search_limit: int = SEARCH_DAILY_CALLS):
+        self._key, self._get, self.search_limit = api_key, get, search_limit
+        self.calls: Counter[str] = Counter()
+
+    def call(self, method: str, params: dict) -> dict:
+        if method == "search" and self.calls[method] >= self.search_limit:
+            raise SearchBudgetExhausted("The daily limit of search calls is used up.")
+        self.calls[method] += 1
+        try:
+            return request_json(API_ROOT + method, params, self._key, self._get)
+        except QuotaExceeded:
+            if method == "search":  # the search bucket ran out; the main pool may be fine
+                raise SearchBudgetExhausted("The daily limit of search calls is used up.") from None
+            raise
+
+    @property
+    def main_units(self) -> int:
+        """Units charged to the main daily pool: every call except `search`."""
+        return sum(n for method, n in self.calls.items() if method != "search")
