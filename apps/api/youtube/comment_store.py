@@ -90,6 +90,16 @@ def known_dedupe_keys() -> set[str]:
         raise StoreError(f"Could not read from MongoDB ({type(exc).__name__}).") from None
 
 
+def channel_ids(subscriber_bands: Iterable[str]) -> list[str]:
+    """The channels of crawled videos whose subscriber band is one of these, sorted."""
+    try:
+        found = collections()[1].distinct(
+            "channel_id", {"stratum.subscriber_band": {"$in": list(subscriber_bands)}, **_live()})
+        return sorted(found)
+    except PyMongoError as exc:
+        raise StoreError(f"Could not read from MongoDB ({type(exc).__name__}).") from None
+
+
 def coverage_rows() -> list[dict]:
     """Videos and comments per cell, for `strata.coverage`."""
     axes = ("category_id", "view_band", "subscriber_band", "age_band")

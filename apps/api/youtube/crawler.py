@@ -114,6 +114,8 @@ def crawl(
     The same seed on the same corpus makes the same choices.
     """
     state = _Crawl(api, seed, now or datetime.now(UTC), region)
+    state.small_channels = comment_store.channel_ids(strata.LOW_SUBSCRIBER_BANDS)
+    state.rng.shuffle(state.small_channels)
     summary = CrawlSummary()
     seen = comment_store.known_dedupe_keys()
     misses: Counter = Counter()

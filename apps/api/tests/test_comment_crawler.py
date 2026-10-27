@@ -593,6 +593,20 @@ def test_a_low_view_band_reads_a_small_channels_uploads_and_a_high_one_the_chart
     assert [c.source for c in state.discover("20", "<1mo", "1k-10k")] == ["most_popular"]  # the channel is used up
 
 
+def test_a_new_run_reads_the_uploads_of_small_channels_already_in_the_corpus(mongo, fake):
+    stratum = {"category_id": "20", "view_band": "<1k", "subscriber_band": "<1k", "age_band": "<1mo"}
+    mongo.database[comment_store.VIDEO_COLLECTION].insert_one(
+        {"_id": "old", "channel_id": "UCsmall", "stratum": stratum, "expires_at": NOW + timedelta(days=400)})
+    fake.add_video("fresh", "UCsmall", views=300, comments=30, age_days=3, subscribers=800, comments_per_page=(30,))
+    fake.uploads = {"UCsmall": ["fresh"]}
+    api = Api(KEY, fake, search_limit=0)
+
+    summary = crawler.crawl(api, 1, seed=1, now=NOW)
+
+    assert summary.videos_kept == 1 and api.calls["search"] == 0
+    assert [v["source"] for v in mongo.database[comment_store.VIDEO_COLLECTION].find({"_id": "fresh"})] == ["uploads"]
+
+
 def _spy_on_targets(monkeypatch):
     chosen = []
     original = crawler._Crawl.discover
